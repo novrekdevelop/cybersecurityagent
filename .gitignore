@@ -1,0 +1,21 @@
+# Informes generados por la herramienta (pueden contener datos de sitios de terceros)
+reports/
+
+# Artefactos de Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Configuración local de IDE / herramientas
+.qodo/
+.vscode/
+.idea/
+*.swp
+
+# Ficheros sensibles locales
+.env
+.env.*
+*.pem
+*.key

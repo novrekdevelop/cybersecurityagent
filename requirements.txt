@@ -1,0 +1,4 @@
+# CyberAudit Pro — Sin dependencias externas.
+# Requiere únicamente Python 3.10 o superior (biblioteca estándar).
+# Instalación:
+#   pip install -r requirements.txt   →   (vacío, no hace falta nada)

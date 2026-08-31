@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Tienda Demo de Pruebas</title>
+<meta name="generator" content="WordPress 6.4.3">
+<script src="https://cdn.example.com/lib.js"></script>
+<script>
+  var API_KEY = "AIzaSy" + "DemosWwwww1234567890" + "12345678901";
+  var price = 99.99;
+  document.write(location.hash);
+</script>
+</head>
+<body>
+<!-- TODO: quitar contraseña de admin en produccion -->
+<p>Contacto: admin@test.local</p>
+<form action="/login" method="POST">
+  <input type="text" name="user" autocomplete="username">
+  <input type="password" name="pass" autocomplete="current-password">
+  <input type="hidden" name="precio" value="19.99">
+  <input type="hidden" name="isadmin" value="false">
+  <button type="submit">Entrar</button>
+</form>
+<a href="/producto?id=1">Producto 1</a>
+<a href="/producto?id=2">Producto 2</a>
+<iframe src="/frame"></iframe>
+<script>
+  eval("1+1");
+  document.getElementById("x").innerHTML = location.search;
+</script>
+</body>
+</html>

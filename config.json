@@ -1,0 +1,39 @@
+{
+  "timeout": 10,
+  "user_agent": "CyberAuditPro/2.0 (auditoría autorizada)",
+  "proxy": null,
+  "verify_tls": true,
+
+  "max_crawl_pages": 40,
+  "max_depth": 3,
+  "concurrency": 12,
+  "port_timeout": 1.5,
+
+  "active_checks": false,
+  "run_recon": true,
+  "run_tls": true,
+  "run_headers": true,
+  "run_content": true,
+  "run_injection": true,
+  "run_directories": true,
+  "run_ports": false,
+  "run_apis": true,
+  "run_auth": true,
+  "run_payments": true,
+  "run_fuzer": false,
+  "run_cves": true,
+  "run_osint": true,
+  "run_emailsec": true,
+  "run_cms": true,
+
+  "enumerate_subdomains": true,
+  "common_subdomains": false,
+  "probe_subdomains": false,
+  "directory_wordlist": null,
+  "directory_max_requests": 220,
+
+  "output_formats": ["json", "html"],
+  "output_dir": "reports",
+  "module_include": [],
+  "module_exclude": []
+}
