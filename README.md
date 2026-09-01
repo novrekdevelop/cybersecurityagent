@@ -26,9 +26,17 @@ cd agentedeciberseguridad
 python main.py --about
 ```
 
-On **Windows** you can run `run.bat` directly to open the interactive menu.
- The
-`test_site/` folder includes a local practice lab to test the
+It only needs **Python 3.10+** (no external dependencies) and runs on
+**Windows, Linux and macOS**. Use the launcher that fits your platform:
+
+| Platform                          | Command                                   |
+|-----------------------------------|-------------------------------------------|
+| **Windows**                       | `run.bat` (double-click, or `.\run.bat`)  |
+| **Linux / macOS**                 | `./run.sh` (first time: `chmod +x run.sh`) |
+| **Any OS with `make`/Git Bash**   | `make run` (same interactive menu)        |
+| **Any OS after `pip install -e .`** | `cyberaudit` (global CLI command)        |
+
+The `test_site/` folder includes a local practice lab to test the
 scanner without leaving your machine.
 
 ---
@@ -54,6 +62,14 @@ python main.py -u https://yourdomain.com --yes --wordlist routes.txt --max-reque
 # List the available modules
 python main.py --about
 ```
+
+> 💡 **Developer shortcuts:** `make run` opens the interactive menu,
+> `make audit URL=https://example.com` runs a full audit,
+> `make demo` serves the local practice lab, and `make selftest` runs the
+> self-test suite.
+
+**One-step launchers:** if you prefer a menu without typing a target, run
+`run.bat` on Windows or `./run.sh` on Linux/macOS.
 
 Reports are saved in `reports/` with a timestamp.
 
