@@ -1,4 +1,4 @@
-"""Reconocimiento pasivo: DNS, RDAP (WHOIS), subdominios y huella tecnológica."""
+"""Passive reconnaissance: DNS, RDAP(WHOIS), subdomainsand technology fingerprint."""
 
 from __future__ import annotations
 
@@ -13,17 +13,17 @@ from ..models import Finding, Severity
 from ..utils import COMMON_SUBDOMAINS, absolute, host_of, info, warn
 from .base import AuditModule
 
-UA = "CyberAuditPro/2.0 (reconocimiento pasivo autorizado)"
+UA = "CyberAuditPro/2.0 (authorized passive reconnaissance)"
 
 
 def _doh(domain: str, rtype: str) -> List[str]:
-    """Consulta DNS sobre HTTPS (Cloudflare) — pasivo y sin binarios externos."""
+    """Queries DNS over HTTPS(Cloudflare) — passiveand without external binaries."""
     _, answers = _doh_lookup(domain, rtype)
     return answers
 
 
 def _doh_lookup(domain: str, rtype: str):
-    """Devuelve (Status, respuestas) de una consulta DoH JSON."""
+    """Returns (Status, answers) of a DoH JSON query."""
     url = f"https://cloudflare-dns.com/dns-query?name={domain}&type={rtype}"
     type_map = {"A": 1, "AAAA": 28, "CNAME": 5, "MX": 15, "TXT": 16, "NS": 2}
     try:
@@ -221,7 +221,7 @@ class ReconModule(AuditModule):
                     remediation=f"Publica SPF, DKIM y DMARC para {domain}.", url=url)
 
             # -- RDAP / WHOIS -----------------------------------------------------------
-            info("Consultando WHOIS/RDAP…")
+            info("Querying WHOIS/RDAP…")
             rdap = _rdap(domain)
             self.assets["rdap"] = {
                 "handle": rdap.get("handle", ""),
@@ -248,10 +248,10 @@ class ReconModule(AuditModule):
     def _find_subdomains(self, domain: str):
         known: Set[str] = set()
         if self.ctx.config.enumerate_subdomains:
-            info("Consultando transparencia de certificados (crt.sh)…")
+            info("Querying certificate transparency(crt.sh)…")
             known.update(_crt_sh(domain))
         if self.ctx.config.common_subdomains:
-            info("Comprobando wordlist de subdominios comunes…")
+            info("Checking common subdomain wordlist…")
             for name in COMMON_SUBDOMAINS:
                 if len(known) >= 250:
                     break
@@ -264,21 +264,21 @@ class ReconModule(AuditModule):
         found = sorted(known)
         self.assets["subdomains"] = found
         if not found:
-            self.log("No se hallaron subdominios mediante transparencia de certificados.")
+            self.log("No subdomains found via certificate transparency.")
             return
-        self.log(f"Se hallaron {len(found)} subdominios.")
+        self.log(f"Found {len(found)} subdomains.")
 
         self._check_takeover(found)
         sensitive = [s for s in found if any(k in s.split(".")[0] for k in SENSITIVE_SUBDOMAIN_KEYWORDS)]
         if sensitive:
             self.register(
-                title="Subdominios potencialmente sensibles expuestos",
-                description="Subdominios cuyo nombre sugiere servicios internos, paneles o "
-                            "entornos de prueba: " + ", ".join(sensitive[:10]),
+                title="Potentially sensitive subdomains exposed",
+                description="Subdomains whose name suggests internal services, panels or "
+                            "test environments: " + ", ".join(sensitive[:10]),
                 severity=Severity.MEDIUM, cwe="CWE-200", owasp="A01:2021",
                 url=self.ctx.target, evidence="\n".join(sensitive[:10]),
-                remediation="Revisa que no estén expuestos servicios sensibles, requieran "
-                            "autenticación y aparezcan en el inventario de activos.",
+                remediation="Check that sensitive services are not exposed, require "
+                            "authenticationand appear in the asset inventory.",
             )
 
     # ------------------------------------------------------------------ takeover
@@ -305,7 +305,7 @@ class ReconModule(AuditModule):
         if at_risk:
             self.assets["takeover_candidates"] = at_risk
             self.register(
-                title="Subdominios secuestrables (subdomain takeover)",
+                title="Hijackable subdomains(subdomain takeover)",
                 description="Estos subdominios tienen un CNAME hacia un servicio externo "
                             "que ya no está asignado (registro DNS colgante). Un atacante "
                             "puede reclamarlo, publicar contenido en el dominio y robar "
@@ -360,7 +360,7 @@ class ReconModule(AuditModule):
                 elif kind == "body":
                     if re.search(pattern, body, re.I):
                         is_found = True
-                        evidences.append("marcador en HTML/JS")
+                        evidences.append("marker in HTML/JS")
                 if is_found:
                     score += weight
             if score >= 7:
@@ -370,6 +370,6 @@ class ReconModule(AuditModule):
         found.sort(key=lambda f: -f["confidence"])
         self.assets["tech"] = found
         if found:
-            self.log("Tecnologías detectadas: " + ", ".join(f["name"] for f in found))
+            self.log("Technologies detected: " + ", ".join(f["name"] for f in found))
         else:
-            self.log("No se identificaron tecnologías conocidas.")
+            self.log("No known technologies identified.")

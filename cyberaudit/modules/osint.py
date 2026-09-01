@@ -1,14 +1,14 @@
-"""Inteligencia pasiva externa (OSINT): exposición pública del objetivo.
+"""Passive external intelligence(OSINT): public exposure of the target.
 
-Esto es lo que hace un equipo de ciberinteligencia antes de tocar el sistema:
-- Consulta **Shodan InternetDB** (gratuito, sin API key) para cada IP del
-  objetivo: puertos que han estado expuestos, CPEs ("productos" detectados),
-  etiquetas y **CVEs conocidos** asociados.
-- Detección de **WAF / CDN** del perímetro (Cloudflare, Incapsula/Imperva,
-  Akamai, Sucuri, Vercel…) para entender qué hay entre el atacante y el origen.
+This is what a cyber-intelligence team does before touchingthe system:
+- Queries **Shodan InternetDB** (free, no API key) for each IP of the
+  target: ports that have been exposed, CPEs ("products" detected),
+  tagsand **known CVEs** associated.
+- Detection of the edge **WAF / CDN** (Cloudflare, Incapsula/Imperva,
+  Akamai,Sucuri,Vercel…) to understand what sits between the attackerand the origin.
 
 Toda la información es pasiva (solo consultas a fuentes públicas). Nunca se
-lanza tráfico contra el objetivo.
+sends traffic against the target.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def _internetdb(ip: str) -> Optional[Dict]:
 
 class OsintModule(AuditModule):
     name = "osint"
-    description = "Inteligencia pasiva externa (Shodan InternetDB, CVEs por IP, WAF)"
+    description = "Passive external intelligence(Shodan InternetDB, CVEs per IP, WAF)"
 
     def run(self):
         domain = host_of(self.ctx.target)
@@ -126,10 +126,10 @@ class OsintModule(AuditModule):
             return
         uniq = list(dict.fromkeys(found))
         self.assets["waf"] = uniq
-        self.log("Perímetro detectado: " + ", ".join(uniq))
+        self.log("Perimeter detected: " + ", ".join(uniq))
         if any(w in uniq for w in ("Cloudflare", "Incapsula (Imperva)", "Akamai")):
             self.register(
-                title="WAF / CDN detectado en el borde",
+                title="WAF / CDN detected at the edge",
                 description="El tráfico pasa por un servicio de protección o aceleración: "
                             + ", ".join(uniq) + ". Verifica que no enmascare el origen "
                             "(bypass de WAF, DNS rebinding o fugas de IP real).",
@@ -149,7 +149,7 @@ class OsintModule(AuditModule):
         public = [ip for ip in dict.fromkeys(ips) if not _is_private(ip)][:6]
         if not public:
             return
-        info("Consultando exposición pública en Shodan InternetDB…")
+        info("Querying public exposure on Shodan InternetDB…")
         exposure = []
         for ip in public:
             data = _internetdb(ip)
@@ -170,11 +170,11 @@ class OsintModule(AuditModule):
             self.register(
                 title=f"IP {data['ip']} asociada a vulnerabilidades conocidas (internetDB)",
                 description="Shodan InternetDB asocia CVEs públicos a esta IP según su "
-                            "histórico de escaneos. Algunos pueden estar ya mitigados, "
-                            "pero indican servicios/versiones que merecen revisión manual.",
+                            "scan history. Some may already be mitigated, "
+                            "but they indicate services/versions that deserve manual review.",
                 severity=Severity.CRITICAL if data.get("cpes") else Severity.HIGH,
                 cwe="CWE-1035", owasp="A06:2021", url=self.ctx.target,
-                evidence=f"IP {data['ip']} · puertos {ports}\n" + "\n".join(vulns[:12]),
-                remediation="Haz inventario de los servicios de la IP, verifica versiones "
-                            "reales y aplica los parches de los CVEs listados; oculta la IP "
-                            "de origen si no necesita estar expuesta.")
+                evidence=f"IP {data['ip']} · ports {ports}\n" + "\n".join(vulns[:12]),
+                remediation="Inventorythe services of the IP, verify real "
+                            "versionsand apply the patches of the listed CVEs; hide the origin "
+                            "IP if it does not need to be exposed.")

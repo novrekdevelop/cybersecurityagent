@@ -1,4 +1,4 @@
-"""Utilidades compartidas: consola, URLs, detección de secretos, DNS y wordlists."""
+"""Shared utilities: console, URLs, secret detection, DNS and wordlists."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import List, Optional
 from urllib import request as _request
 from urllib.parse import urljoin, urlparse, urlunparse
 
-# --------------------------------------------------------------------------- consola
+# --------------------------------------------------------------------------- console
 RESET = "\033[0m"
 BOLD = "\033[1m"
 DIM = "\033[2m"
@@ -26,7 +26,7 @@ _COLOR_ON = True
 
 
 def enable_windows_ansi() -> None:
-    """Activa soporte ANSI en consolas de Windows 10+ (VT100)."""
+    """Enables ANSI support on Windows 10+ consoles (VT100)."""
     if os.name == "nt":
         try:
             import ctypes
@@ -70,15 +70,15 @@ def info(msg: str) -> None:
 
 # --------------------------------------------------------------------------- URLs
 def normalize_url(raw: str) -> str:
-    """Normaliza una URL añadiendo https:// si falta y limpiando el path."""
+    """Normalizes a URL, adding https:// if missing and cleaning the path."""
     url = raw.strip()
     if not url:
-        raise ValueError("URL vacía.")
+        raise ValueError("Empty URL.")
     if not url.lower().startswith(("http://", "https://")):
         url = "https://" + url
     u = urlparse(url)
     if not u.netloc:
-        raise ValueError(f"URL no válida: {raw!r}")
+        raise ValueError(f"Invalid URL: {raw!r}")
     host = u.netloc.lower()
     path = u.path or "/"
     return urlunparse((u.scheme.lower(), host, path, u.params, u.query, u.fragment))
@@ -98,7 +98,7 @@ def same_origin(a: str, b: str) -> bool:
 
 
 def absolute(base: str, ref: str) -> Optional[str]:
-    """Convierte una referencia relativa en URL absoluta http(s)."""
+    """Converts a relative reference into an absolute http(s) URL."""
     url = urljoin(base, ref.strip())
     if url.startswith(("http://", "https://")):
         return url
@@ -115,9 +115,9 @@ _DOH_TYPE = {"A": 1, "AAAA": 28, "CNAME": 5, "MX": 15, "TXT": 16, "NS": 2}
 
 
 def doh_lookup(domain: str, rtype: str, timeout: float = 6.0, us: str = "CyberAuditPro/2.0") -> List[str]:
-    """Consulta registros DNS vía DNS sobre HTTPS (Cloudflare), sin binarios externos.
+    """Queries DNS records via DNS over HTTPS (Cloudflare), no external binaries.
 
-    Devuelve las respuestas del tipo pedido ('' si falla o no existen).
+    Returns the answers for the requested type ('' if it fails or doesn't exist).
     """
     type_id = _DOH_TYPE.get(rtype.upper())
     if not type_id:
@@ -134,40 +134,40 @@ def doh_lookup(domain: str, rtype: str, timeout: float = 6.0, us: str = "CyberAu
 
 
 def doh_txt(domain: str) -> List[str]:
-    """Registros TXT de un nombre de dominio (útil para SPF/DKIM/DMARC)."""
+    """TXT records for a domain (useful for SPF/DKIM/DMARC)."""
     return doh_lookup(domain, "TXT")
 
 
-# --------------------------------------------------------------------------- secretos
+# --------------------------------------------------------------------------- secrets
 SECRET_PATTERNS: dict = {
-    "clave_privada": re.compile(r"-----BEGIN (?:RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----"),
+    "private_key": re.compile(r"-----BEGIN (?:RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----"),
     "aws_access_key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
-    "api_key_google": re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b"),
-    "secret_stripe": re.compile(r"\bsk_(?:live|test)_[0-9a-zA-Z]{16,}\b"),
-    "token_github": re.compile(r"\bgh[pousr]_[0-9A-Za-z]{36,}\b"),
-    "token_slack": re.compile(r"\bxox[baprs]-[0-9A-Za-z\-]{10,}\b"),
-    "jwt_embebido": re.compile(r"\beyJ[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\b"),
-    "password_en_codigo": re.compile(r"""(?i)(password|passwd|pwd)\s*[:=]\s*["'][^"']{3,}["']"""),
-    "clave_secreta": re.compile(r"""(?i)(secret|client_secret|app_secret|api_secret)\s*[:=]\s*["'][^"']{3,}["']"""),
-    "authorization_estatico": re.compile(r"""(?i)(authorization|bearer)\s*[:=]\s*["'][A-Za-z0-9\-._~+/]{12,}["']"""),
-    "token_firebase": re.compile(r"\bAAAA[A-Za-z0-9_\-]{80,}\b"),
+    "google_api_key": re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b"),
+    "stripe_secret": re.compile(r"\bsk_(?:live|test)_[0-9a-zA-Z]{16,}\b"),
+    "github_token": re.compile(r"\bgh[pousr]_[0-9A-Za-z]{36,}\b"),
+    "slack_token": re.compile(r"\bxox[baprs]-[0-9A-Za-z\-]{10,}\b"),
+    "embedded_jwt": re.compile(r"\beyJ[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\b"),
+    "password_in_code": re.compile(r"""(?i)(password|passwd|pwd)\s*[:=]\s*["'][^"']{3,}["']"""),
+    "secret_in_code": re.compile(r"""(?i)(secret|client_secret|app_secret|api_secret)\s*[:=]\s*["'][^"']{3,}["']"""),
+    "static_authorization": re.compile(r"""(?i)(authorization|bearer)\s*[:=]\s*["'][A-Za-z0-9\-._~+/]{12,}["']"""),
+    "firebase_token": re.compile(r"\bAAAA[A-Za-z0-9_\-]{80,}\b"),
     "recaptcha_key": re.compile(r"\b6L[0-9A-Za-z_\-]{38}\b"),
 }
 
-# Patrones de sinks peligrosos en JavaScript
+# Dangerous JavaScript sinks
 JS_DANGEROUS_SINKS = [
-    (re.compile(r"\beval\s*\("), "eval() ejecuta código arbitrario desde cadenas"),
-    (re.compile(r"\bdocument\.write\s*\("), "document.write() puede inyectar contenido no sanitizado"),
-    (re.compile(r"\b\.innerHTML\s*="), "innerHTML permite inyección de HTML/JS"),
-    (re.compile(r"\bouterHTML\s*="), "outerHTML permite inyección de HTML/JS"),
-    (re.compile(r"\bdangerouslySetInnerHTML"), "dangerouslySetInnerHTML (React) inyecta HTML directo"),
-    (re.compile(r"\binsertAdjacentHTML\s*\("), "insertAdjacentHTML puede inyectar HTML"),
-    (re.compile(r"\bpostMessage\s*\(\s*['\"][^*]"), "postMessage a orígenes no verificados"),
+    (re.compile(r"\beval\s*\("), "eval() executes arbitrary code from strings"),
+    (re.compile(r"\bdocument\.write\s*\("), "document.write() can inject unsanitized content"),
+    (re.compile(r"\b\.innerHTML\s*="), "innerHTML allows HTML/JS injection"),
+    (re.compile(r"\bouterHTML\s*="), "outerHTML allows HTML/JS injection"),
+    (re.compile(r"\bdangerouslySetInnerHTML"), "dangerouslySetInnerHTML (React) injects raw HTML"),
+    (re.compile(r"\binsertAdjacentHTML\s*\("), "insertAdjacentHTML can inject HTML"),
+    (re.compile(r"\bpostMessage\s*\(\s*['\"][^*]"), "postMessage to unverified origins"),
 ]
 
 
 def detect_secrets(text: str) -> List[str]:
-    """Devuelve la lista de tipos de secretos hallados en un texto (muestra ≤200KB)."""
+    """Returns the list of secret types found in a text (sample ≤200KB)."""
     found: List[str] = []
     sample = text[:200_000]
     for name, pat in SECRET_PATTERNS.items():
@@ -176,17 +176,17 @@ def detect_secrets(text: str) -> List[str]:
     return found
 
 
-# --------------------------------------------------------------------------- errores
+# --------------------------------------------------------------------------- errors
 ERROR_PATTERNS = [
     (re.compile(r"(?i)sql syntax|mysql_fetch|sqlstate\[|you have an error in your sql"),
-     "Error SQL clásico (MySQL)"),
-    (re.compile(r"(?i)unclosed quotation mark|microsoft oledb"), "Error SQL Server"),
-    (re.compile(r"(?i)duplicate key val|psycopg2|postgresql"), "Error SQL (PostgreSQL/ORM)"),
-    (re.compile(r"(?i)ora-\d{5}"), "Error Oracle"),
-    (re.compile(r"(?i)java\.sql\.sqlexception|jdbc\."), "Error Java/SQL"),
+     "Classic SQL error (MySQL)"),
+    (re.compile(r"(?i)unclosed quotation mark|microsoft oledb"), "SQL Server error"),
+    (re.compile(r"(?i)duplicate key val|psycopg2|postgresql"), "SQL error (PostgreSQL/ORM)"),
+    (re.compile(r"(?i)ora-\d{5}"), "Oracle error"),
+    (re.compile(r"(?i)java\.sql\.sqlexception|jdbc\."), "Java/SQL error"),
     (re.compile(r"(?i)debug\s*=\s*true|traceback \(most recent call last\)|line \d+, in "),
-     "Traza o modo debug activo"),
-    (re.compile(r"(?i)xdebug|stack trace:"), "Depuración activa"),
+     "Traceback or debug mode active"),
+    (re.compile(r"(?i)xdebug|stack trace:"), "Debugging active"),
 ]
 
 # --------------------------------------------------------------------------- wordlists
@@ -204,54 +204,54 @@ COMMON_SUBDOMAINS = [
     "kibana", "grafana", "monitoring", "zabbix", "nagios", "logs", "backup",
 ]
 
-# Rutas y archivos sensibles
+# Sensitive paths and files
 DIRECTORY_WORDLIST: List[str] = [
-    # Paneles y zonas de administración
+    # Admin panels and management areas
     "admin", "administrator", "admin.php", "admin/", "backend", "backoffice",
     "panel", "console", "dashboard", "wp-admin", "wp-login.php", "wp-content",
     "wp-includes", "wp-json", "administrator/", "adminer.php", "phpmyadmin",
     "pma", "pgadmin", "mysql/", "dbadmin", "maaticket", "webmail",
-    # Autenticación
+    # Authentication
     "login", "signin", "signup", "auth", "account", "user", "users",
     "register", "password", "reset", "forgot", "sso", "oauth",
-    # API y documentación
+    # API and documentation
     "api", "api/", "api/v1", "api/v2", "graphql", "rest", "swagger-ui.html",
     "swagger/", "swagger/index.html", "api-docs", "openapi.json", "v2/api-docs",
     "actuator", "actuator/env", "actuator/health", "actuator/beans",
-    # Control de versiones y configuración
+    # Version control and configuration
     ".git/", ".git/config", ".git/HEAD", ".gitignore", ".hg/", ".svn/",
     ".env", ".env.local", ".env.production", ".env.dev", "config.php",
     "config.php.bak", "config.php~", "configuration.php", "settings.php",
     "wp-config.php", "wp-config.php.bak", "wp-config.php~", "web.config",
     ".htaccess", ".htpasswd", "db.php", "database.php", "conn.php",
     "index.php.bak", "index.php~", "config.inc.php", "application.ini",
-    # Backups y volcados de base de datos
+    # Backups and database dumps
     "databases.sql", "db.sql", "dump.sql", "backup.sql", "database.sql",
     "backup.zip", "backup.tar.gz", "backup.tar", "site.zip", "site.tar.gz",
     "backups/", "backups.zip", "bbdd.sql", "dump/", "archive/", "old/",
-    # Ficheros de metadatos del sistema
+    # System metadata files
     ".DS_Store", "Thumbs.db", "desktop.ini", "package-lock.json",
     "composer.json", "composer.lock", "package.json", "yarn.lock",
     "vendor/", "node_modules/", "environment.json", "runtime.json",
-    # Información pública
+    # Public information
     "robots.txt", "sitemap.xml", "security.txt", ".well-known/security.txt",
     "crossdomain.xml", "clientaccesspolicy.xml", "humans.txt",
     "README", "README.md", "LICENSE", "CHANGELOG", "INSTALL", "UPGRADE",
     "phpinfo.php", "info.php", "test.php", "info", "version", "server-status",
     "server-info", "status", "health", "healthz", "ping", "debug",
-    # Logs y trazas
+    # Logs and traces
     "log/", "logs/", "log.txt", "error.log", "access.log", "debug.log",
     "trace.log", "application.log", "nginx/logs/", "logging/",
-    # Directorios de contenido
+    # Content directories
     "upload/", "uploads/", "upload.php", "images/", "img/", "js/", "css/",
     "assets/", "fonts/", "media/", "files/", "tmp/", "temp/", "cache/",
-    # Otros endpoints comunes
+    # Other common endpoints
     "xmlrpc.php", "owa", "exchange", "autodiscover", "actuator", "selenium",
     "cgi-bin/", "scripts/", "cron", "cron.php", "shell", "server-diagnostics",
     "service-worker.js", "manifest.json", "content.xml", "crossdomain",
 ]
 def load_wordlist(path: Optional[str] = None) -> List[str]:
-    """Carga wordlist de directorios desde fichero o usa la incorporada."""
+    """Loads a directory wordlist from a file or uses the built-in one."""
     if path and Path(path).exists():
         lines = [
             ln.strip()
@@ -263,7 +263,7 @@ def load_wordlist(path: Optional[str] = None) -> List[str]:
 
 
 def read_robots_disallow(text: str) -> List[str]:
-    """Extrae reglas Disallow de un robots.txt."""
+    """Extracts Disallow rules from a robots.txt."""
     out: List[str] = []
     for line in text.splitlines():
         if line.lower().startswith("disallow"):

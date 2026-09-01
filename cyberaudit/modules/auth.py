@@ -1,11 +1,11 @@
-"""Análisis profundo de autenticación, sesión y caminos de evasión del login.
+"""Deep analysis of authentication, sessions and login bypass paths.
 
-Detección pasiva + sondas benignas:
-- Formularios/endpoints de login: ¿hay rate limiting?, ¿envía credenciales a
-  terceros?, ¿credenciales por GET/HTTP?
-- Tokens (JWT, sesión, API) expuestos en URLs o en localStorage/sessionStorage.
-- Política de contraseñas débil (minlength).
-- Open redirect en los parámetros de redirección (solo --active, benigno).
+Passive detection + benign probes:
+- Login forms/endpoints: is there rate limiting?, does it send credentials to
+  third parties?, credentials over GET/HTTP?
+- Tokens (JWT, session, API) exposed in URLs or in localStorage/sessionStorage.
+- Weak password policy (minlength).
+- Open redirect in redirection parameters (only --active, benign).
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def _b64url_decode(seg: str) -> bytes:
 
 
 def _jwt_parts(token: str):
-    """Devuelve (ok, header_dict, payload) decodificados de forma segura."""
+    """Safely decodes the token into (ok, header_dict, payload)."""
     parts = token.split(".")
     if len(parts) != 3:
         return False, {}, {}
@@ -55,7 +55,7 @@ def _jwt_parts(token: str):
 
 class AuthModule(AuditModule):
     name = "auth"
-    description = "Autenticación, sesiones y caminos de evasión del login"
+    description = "Authentication, sessions and login bypass paths"
 
     def run(self):
         self._seen: Set[str] = set()
@@ -64,27 +64,27 @@ class AuthModule(AuditModule):
         js_all = self.assets.get("js_analyzed", [])
         base_url = self.ctx.base.url or self.ctx.target
 
-        # 1) Endpoints de login y su endurecimiento
+        # 1) Login endpoints and their hardening
         logins = self.assets.get("login_forms", [])
         if not logins:
             self._find_login_hints(pages, bodies)
         else:
-            self.log(f"Endpoints de login: {len(logins)}")
+            self.log(f"Login endpoints: {len(logins)}")
 
-        # 2) Tokens en URLs (fuga pasiva)
+        # 2) Tokens in URLs (passive leak)
         self._check_url_tokens(pages)
 
-        # 3) Tokens en localStorage (XSS -> robo de sesión)
+        # 3) Tokens in localStorage (XSS -> session theft)
         self._check_storage_tokens(js_all, bodies)
 
-        # 4) Política de contraseñas desde el HTML
+        # 4) Password policy from the HTML
         self._check_password_policy(pages)
 
-        # 5) Sondas benignas en el flujo de login (solo --active)
+        # 5) Benign probes in the login flow (only --active)
         if self.ctx.config.active_checks:
             self._check_login_flow(logins, base_url)
 
-        # 6) Análisis profundo de JWT encontrados
+        # 6) Deep analysis of found JWTs
         self._check_jwts(js_all, bodies)
 
     # -------PART2-------
@@ -105,7 +105,7 @@ class AuthModule(AuditModule):
         self._seen.add(key)
         return True
 
-    # ------------------------------------------------------------------ tokens en URL
+    # ------------------------------------------------------------------ tokens in URL
     def _check_url_tokens(self, pages):
         for page in pages[:60]:
             q = urlparse(page["url"]).query
@@ -118,16 +118,16 @@ class AuthModule(AuditModule):
             if not self._sep(ident):
                 continue
             self.register(
-                title="Parámetro sensible en la URL (fuga de sesión/token)",
-                description=f"El parámetro '{m.group(1)}' aparece en la cadena de la URL. "
-                            "Queda en historial, logs, Referer y proxies, permitiendo "
-                            "robo de sesión.",
+                title="Sensitive parameter in the URL (session/token leak)",
+                description=f"The parameter '{m.group(1)}' appears in the URL query string. "
+                            "It stays in history, logs, Referer and proxies, allowing "
+                            "session theft.",
                 severity=Severity.HIGH, cwe="CWE-598", owasp="A03:2021",
                 url=page["url"], evidence=f"?{q[:200]}",
-                remediation="Envía tokens y credenciales en el cuerpo (POST) o en "
-                            "cabeceras HTTP, nunca en la query.")
+                remediation="Send tokens and credentials in the body (POST) or in "
+                            "HTTP headers, never in the query.")
 
-    # ------------------------------------------------------------------ tokens en storage
+    # ------------------------------------------------------------------ tokens in storage
     def _check_storage_tokens(self, js_all, bodies):
         for rec in js_all[:40]:
             content = rec.get("content", "")[:150_000]
@@ -138,16 +138,16 @@ class AuthModule(AuditModule):
                     rf"localStorage\s*\.\s*setItem\s*\(\s*['\"]{re.escape(key)}['\"]", re.I)
                 if rx.search(content) and self._sep("storage:" + key):
                     self.register(
-                        title="Token/credencial almacenado en localStorage",
-                        description=f"El código guarda '{key}' en localStorage. Un XSS "
-                                    "puede leerlo y robar la sesión; además persiste tras "
-                                    "cerrar el navegador.",
+                        title="Token/credential stored in localStorage",
+                        description=f"The code stores '{key}' in localStorage. An XSS "
+                                    "can read it and steal the session; it also persists after "
+                                    "closing the browser.",
                         severity=Severity.MEDIUM, cwe="CWE-922", owasp="A03:2021",
                         url=rec.get("url", self.ctx.target), evidence=key,
-                        remediation="Guarda el token en una cookie HttpOnly+Secure o en "
-                                    "memoria; evita localStorage para secretos.")
+                        remediation="Store the token in an HttpOnly+Secure cookie or in "
+                                    "memory; avoid localStorage for secrets.")
 
-    # ------------------------------------------------------------------ contraseñas
+    # ------------------------------------------------------------------ passwords
     def _check_password_policy(self, pages):
         for page in pages:
             for form in page.get("forms", []):
@@ -158,17 +158,17 @@ class AuthModule(AuditModule):
                     ident = "pwd|" + page["url"] + "|" + str(len(form.get("fields", [])))
                     if (not minlen or not minlen.isdigit() or int(minlen) < 8) and self._sep(ident):
                         self.register(
-                            title="Política de contraseñas débil (login)",
-                            description="El campo de contraseña no exige una longitud mínima "
-                                        "de 8 caracteres; credenciales triviales y fuerza "
-                                        "bruta más fácil.",
+                            title="Weak password policy (login)",
+                            description="The password field does not require a minimum length "
+                                        "of 8 characters, making trivial credentials and brute "
+                                        "force easier.",
                             severity=Severity.LOW, cwe="CWE-521", owasp="A07:2021",
                             url=page["url"],
-                            evidence=f"minlength={minlen or '(no definido)'}",
-                            remediation="Exige contraseñas de mínimo 8-12 caracteres y "
-                                        "complejidad en el servidor.")
+                            evidence=f"minlength={minlen or '(not defined)'}",
+                            remediation="Require strong passwords (minimum 8-12 characters) " 
+                                        "and enforce complexity server-side.")
 
-    # ------------------------------------------------------------------ flujo de login
+    # ------------------------------------------------------------------ login flow
     def _check_login_flow(self, logins, base_url):
         from urllib.parse import parse_qsl
         origin = origin_of(base_url)
@@ -177,31 +177,31 @@ class AuthModule(AuditModule):
             if not url:
                 continue
             action = entry.get("action") or ""
-            # Credenciales a un dominio externo
+            # Credentials sent to an external domain
             if action and not same_origin(action, base_url):
                 if self._sep("ext|" + action):
                     self.register(
-                        title="El login envía credenciales a un dominio externo",
-                        description=f"El formulario de login envía las credenciales a "
-                                    f"'{action}', fuera del origen del sitio.",
+                        title="Login sends credentials to an external domain",
+                        description=f"The login form sends the credentials to "
+                                    f"'{action}', outside the site's origin.",
                         severity=Severity.HIGH, cwe="CWE-320", owasp="A01:2021",
                         url=url, evidence=f"action={action}",
-                        remediation="Verifica la integridad del destino; para SSO externo "
-                                    "usa OIDC/SAML y nunca credenciales en claro.")
-            # Rate limiting del login
+                        remediation="Verify the destination integrity; for external SSO "
+                                    "use OIDC/SAML and never send clear-text credentials.")
+            # Login rate limiting
             resp = self.ctx.http.get(url)
             rate_hits = [k for k, v in resp.header_items if "ratelimit" in k or k == "retry-after"]
             if resp.status == 200 and not rate_hits and self._sep("rl|" + url):
                 self.register(
-                    title="Login sin control de intentos (rate limiting)",
-                    description="La página de login no declara cabeceras de rate limiting; "
-                                "sin bloqueo, es candidata a fuerza bruta de credenciales.",
+                    title="Login without attempt rate limiting",
+                    description="The login page does not declare rate limiting headers; "
+                                "without lockout, it is a candidate for credential brute force.",
                     severity=Severity.MEDIUM, cwe="CWE-307", owasp="A07:2021",
                     url=url,
-                    evidence="Cabeceras: " + (", ".join(k for k, _ in resp.header_items) or "—"),
-                    remediation="Aplica bloqueo tras N intentos fallidos, backoff y rate "
-                                "limiting por IP/cuenta.")
-            # Open redirect (sonda benigna)
+                    evidence="Headers: " + (", ".join(k for k, _ in resp.header_items) or "—"),
+                    remediation="Apply lockout after N failed attempts, backoff and rate "
+                                "limiting per IP/account.")
+            # Open redirect (benign probe)
             parsed = urlparse(url)
             if parsed.query:
                 for k, v in parse_qsl(parsed.query, keep_blank_values=True):
@@ -214,14 +214,15 @@ class AuthModule(AuditModule):
                     if rr.status in (301, 302, 303, 307, 308) and loc and \
                             "example.com" in loc and self._sep("redir|" + k + url):
                         self.register(
-                            title="Open redirect en flujo de login",
-                            description="El parámetro de redirección refleja un destino "
-                                        "externo y el servidor responde 3xx hacia él "
-                                        "(sonda benigna). Permite phishing que salta avisos.",
+                            title="Open redirect in login flow",
+                            description="The redirection parameter reflects an external "
+                                        "destination and the server responds 3xx to it "
+                                        "(benign probe)**, which allows phishing that skips "
+                                        "warnings.",
                             severity=Severity.HIGH, cwe="CWE-601", owasp="A01:2021",
                             url=test, evidence=f"Location: {loc}",
-                            remediation="Valida las redirecciones contra una lista blanca "
-                                        "de orígenes.")
+                            remediation="Validate redirects against a whitelist "
+                                        "of origins.")
                     break
 
     # ------------------------------------------------------------------ JWT
@@ -248,7 +249,7 @@ class AuthModule(AuditModule):
                     tokens.append((tok, page["url"]))
         if not tokens:
             return
-        self.log(f"Se encontraron {len(tokens)} tokens JWT en el cliente.")
+        self.log(f"Found {len(tokens)} JWT tokens in the client.")
 
         for tok, src_url in tokens[:8]:
             ok, header, payload = _jwt_parts(tok)
@@ -258,26 +259,26 @@ class AuthModule(AuditModule):
             alg = str(header.get("alg", "?")).upper()
             if alg == "NONE":
                 self.register(
-                    title="JWT con algoritmo 'none' (falsable sin firma)",
-                    description="El JWT declara alg=none; si el servidor lo acepta, se "
-                                "pueden forjar tokens de administración sin secreto.",
+                    title="JWT with 'none' algorithm (forgeable without signature)",
+                    description="The JWT declares alg=none; ifthe server accepts it, admin "
+                                "tokens can be forged without a secret.",
                     severity=Severity.CRITICAL, cwe="CWE-347", owasp="A07:2021",
                     url=src_url, evidence=tok[:120] + "…",
-                    remediation="Rechaza tokens con alg=none; fija un algoritmo whitelist "
-                                "(HS256/RS256) y verifica firma.")
+                    remediation="Reject tokenswith alg=none; set an algorithm whitelist "
+                                "(HS256/RS256) and verify signatures.")
                 continue
             if isinstance(payload, dict):
                 sensitive = [k for k in payload
                              if k in ("password", "secret", "card", "admin", "private")]
                 if sensitive:
                     self.register(
-                        title="JWT expone claims sensibles en el cliente",
-                        description="El token visible contiene campos sensibles: " +
+                        title="JWT exposes sensitive claims in the client",
+                        description="The visible token contains sensitive fields: " +
                                     ", ".join(sensitive) + ".",
                         severity=Severity.MEDIUM, cwe="CWE-922", owasp="A05:2021",
                         url=src_url, evidence=str(payload)[:200],
-                        remediation="No pongas datos sensibles en el JWT; usa referencias "
-                                    "por id o cifra las claims.")
+                        remediation="Do not put sensitive data in the JWT; use references "
+                                    "by id or encrypt the claims.")
             # HMAC débil (HS256/HS384/HS512)
             if alg in ("HS256", "HS384", "HS512") and len(parts) == 3:
                 signing_input = f"{parts[0]}.{parts[1]}".encode()
@@ -289,12 +290,12 @@ class AuthModule(AuditModule):
                     cand = base64.urlsafe_b64encode(dig).rstrip(b"=").decode()
                     if hmac.compare_digest(cand, sig):
                         self.register(
-                            title="JWT firmado con secreto HMAC débil (forjable)",
+                            title="JWT signed with a weak HMAC secret(forgeable)",
                             description=f"El token usa {alg} con la clave trivial "
-                                        f"'{secret}'; se puede recomputar la firma y "
-                                        "crear tokens de administración.",
+                                        f"'{secret}';the signature can be recomputedand "
+                                        "admin tokens created.",
                             severity=Severity.CRITICAL, cwe="CWE-347", owasp="A07:2021",
                             url=src_url, evidence=tok[:120] + "…",
-                            remediation="Usa secretos de alta entropía (≥32 bytes) y rota "
-                                        "la clave actual.")
+                            remediation="Use high-entropy secrets(≥32 bytes( and rotate "
+                                        "the current key.")
                         break

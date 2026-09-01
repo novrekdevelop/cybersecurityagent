@@ -1,6 +1,6 @@
 {
   "timeout": 10,
-  "user_agent": "CyberAuditPro/2.0 (auditoría autorizada)",
+  "user_agent": "CyberAuditPro/2.0 (authorized audit)",
   "proxy": null,
   "verify_tls": true,
 

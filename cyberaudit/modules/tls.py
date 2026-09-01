@@ -1,4 +1,4 @@
-"""Análisis del certificado TLS y de los protocolos SSL/TLS soportados."""
+"""Analysis of the TLS certificate and supported SSL/TLS protocols."""
 
 from __future__ import annotations
 
@@ -54,14 +54,14 @@ def _probe_protocol(host: str, min_v, max_v, timeout: float = 5.0) -> str:
         ctx.maximum_version = max_v
         with socket.create_connection((host, 443), timeout=timeout) as raw:
             with ctx.wrap_socket(raw, server_hostname=host) as ss:
-                return f"soportado ({ss.version()})"
+                return f"supported ({ss.version()})"
     except ssl.SSLError:
-        return "rechazado"
+        return "rejected"
     except (socket.timeout, TimeoutError, ConnectionRefusedError,
             ConnectionResetError, OSError):
-        return "no_accesible"
+        return "not_reachable"
     except (ValueError, Exception):
-        return "no_comprobable"
+        return "not_testable"
 
 
 def _parse_gmt(gmt: str) -> Optional[datetime.datetime]:
@@ -76,71 +76,71 @@ def _parse_gmt(gmt: str) -> Optional[datetime.datetime]:
 
 class TLSModule(AuditModule):
     name = "tls"
-    description = "Certificado digital y versiones de TLS"
+    description = "Digital certificate and TLS versions"
 
     def run(self):
         host = host_of(self.ctx.target)
         if not host:
             return
-        info("Analizando TLS y certificado…")
+        info("Analyzing TLS and certificate…")
         cert = _get_cert(host)
         self.assets["tls"] = cert or {}
         if not cert:
             self.register(
-                title="No se pudo obtener el certificado TLS",
-                description="El handshake TLS falló o el puerto 443 no responde.",
+                title="Could not obtain the TLS certificate",
+                description="The TLS handshake failed or port 443 does not respond.",
                 severity=Severity.MEDIUM, cwe="CWE-295", owasp="A02:2021",
                 url=self.ctx.target,
-                remediation="Verifica la configuración del certificado en el servidor.")
+                remediation="Verify the certificate configuration on the server.")
             return
-        self.log(f"Protocolo: {cert['version']} · Cipher: {cert['cipher']}")
+        self.log(f"Protocol: {cert['version']} · Cipher: {cert['cipher']}")
 
         na = _parse_gmt(cert.get("notAfter", ""))
         now = datetime.datetime.now(datetime.timezone.utc)
         if na and na < now:
             self.register(
-                title="Certificado EXPIRADO",
-                description="El certificado caducó. Provoca errores de confianza y "
-                            "rompe el cifrado para los usuarios.",
+                title="Certificate EXPIRED",
+                description="The certificate has expired. It causes trust errors and "
+                            "breaks encryption for users.",
                 severity=Severity.HIGH, cwe="CWE-295", owasp="A02:2021",
                 url=self.ctx.target, evidence=cert["notAfter"],
-                remediation="Renueva el certificado inmediatamente.")
+                remediation="Renew the certificate immediately.")
         elif na and na < now + datetime.timedelta(days=30):
             self.register(
-                title="Certificado a punto de caducar",
-                description="Caduca en menos de 30 días.",
+                title="Certificate about to expire",
+                description="It expires in less than 30 days.",
                 severity=Severity.MEDIUM, cwe="CWE-295", owasp="A02:2021",
                 url=self.ctx.target, evidence=cert["notAfter"],
-                remediation="Renueva el certificado antes de la fecha de caducidad.")
+                remediation="Renew the certificate before the expiry date.")
 
         nb = _parse_gmt(cert.get("notBefore", ""))
         if nb and nb > now:
             self.register(
-                title="Certificado con fecha de emisión futura",
-                description="notBefore en el futuro; los clientes lo rechazarán.",
+                title="Certificate with future issue date",
+                description="notBefore in the future; clients will reject it.",
                 severity=Severity.MEDIUM, cwe="CWE-295", owasp="A02:2021",
                 url=self.ctx.target,
-                remediation="Reinstala un certificado con fecha válida.")
+                remediation="Reinstall a certificate with a valid date.")
 
         # -------PART2-------
 
         san = [s.lower() for s in cert.get("san", [])]
         if host not in san:
             self.register(
-                title="El certificado no cubre el dominio",
-                description=f"El certificado tiene SAN={cert['san']} y no incluye a {host}.",
+                title="The certificate does not cover the domain",
+                description=f"The certificate has SAN={cert['san']} and does not include {host}.",
                 severity=Severity.HIGH, cwe="CWE-295", owasp="A02:2021",
                 url=self.ctx.target,
-                remediation="Regenera el certificado incluyendo el dominio en SAN.")
+                remediation="Regenerate the certificate including the domain in SAN.")
 
         if cert.get("subject") and cert["subject"] == cert.get("issuer"):
             self.register(
-                title="Certificado autofirmado",
-                description="El emisor y el sujeto coinciden: no es de confianza para usuarios "
-                            "finales y facilita ataques MITM.",
+                title="Self-signed certificate",
+                description="The issuer and subject match: not trustworthy for end users "
+                            "and it facilitates MITM attacks.",
                 severity=Severity.MEDIUM, cwe="CWE-295", owasp="A02:2021",
                 url=self.ctx.target,
-                remediation="Usa un certificado de una CA reconocida (Let's Encrypt, etc.).")
+                remediation="Use a certificate from a recognized CA (Let's Encrypt, etc.).")
 
         self._probe_protocols(host)
 
@@ -154,18 +154,18 @@ class TLSModule(AuditModule):
         }.items():
             results[name] = _probe_protocol(host, min_v, max_v)
         self.assets["tls"]["protocols"] = results
-        supported = [n for n, r in results.items() if r.startswith("soportado")]
+        supported = [n for n, r in results.items() if r.startswith("supported")]
         weak = [n for n in supported if n in ("TLS 1.0", "TLS 1.1")]
         if weak:
             self.register(
-                title="Protocolos TLS obsoletos soportados",
-                description="Se permite negociar " + ", ".join(weak) + ", afectados por "
+                title="Obsolete TLS protocols supported",
+                description="Negotiation of " + ", ".join(weak) + " is allowed, affected by "
                             "BEAST, POODLE, Lucky13…",
                 severity=Severity.HIGH, cwe="CWE-327", owasp="A02:2021",
                 url=self.ctx.target,
                 evidence="; ".join(f"{n}: {r}" for n, r in results.items()),
-                remediation="Deshabilita TLS 1.0/1.1; exige TLS 1.2 como mínimo.")
+                remediation="Disable TLS 1.0/1.1; require TLS 1.2 as a minimum.")
         else:
-            self.log("Protocolos: " + "; ".join(f"{n}={r}" for n, r in results.items()))
+            self.log("Protocols: " + "; ".join(f"{n}={r}" for n, r in results.items()))
         if supported and supported[-1] not in ("TLS 1.2", "TLS 1.3"):
-            self.log("Aviso: no se detectó TLS 1.2/1.3.")
+            self.log("Warning: TLS 1.2/1.3 was not detected.")

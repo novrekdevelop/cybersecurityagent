@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Autocomprobación profunda: sitio con APIs, login y pago vulnerables."""
+"""Deep self-test: site with vulnerable APIs, login and payments."""
 import http.server
 import json
 import socketserver
@@ -10,26 +10,26 @@ from cyberaudit.cli import main
 
 PORT = 8897
 
-INDEX = """<!DOCTYPE html><html><head><title>Tienda Premium</title>
+INDEX = """<!DOCTYPE html><html><head><title>Premium Shop</title>
 <script src="/app.js"></script></head>
 <body>
 <form action="/login?next=/dashboard" method="POST">
   <input type="text" name="user"><input type="password" name="pass">
-  <button>Entrar</button>
+  <button>Sign in</button>
 </form>
 <a href="/checkout">Checkout</a><a href="/login?next=/dashboard">Login</a>
-<a href="/api/users">Usuarios</a><a href="/graphql">GraphQL</a>
+<a href="/api/users">Users</a><a href="/graphql">GraphQL</a>
 </body></html>"""
 
 def _demo(*parts):
-    """Ensambla un valor DEMO en tiempo de ejecución.
+    """Assemblesa DEMO value at runtime.
 
-    Git y GitHub (Push Protection / secret scanning) rechazan los commits
-    que contienen literales que *parecen* credenciales reales. Los valores
-    de este laboratorio son 100 % DEMO (no pertenecen a ninguna cuenta) y
-    se reconstruyen al arrancar para que CyberAudit Pro pueda seguir
-    probando su detector de secretos contra contenido realista sin
-    alojar ninguna credencial aparente en el repositorio.
+    Git and GitHub(Push Protection / secret scanning) reject commits
+    that contain literals that *look like* real credentials. The values
+    of this lab are 100% DEMO (do not belong to any account) and
+    are rebuilt at startup so that CyberAudit Pro can keep
+    testing its secret detector against realistic content without
+    hosting any apparent credential in the repository.
     """
     return "".join(parts)
 
@@ -47,15 +47,15 @@ var sk = "%s";
 
 CHECKOUT = """<!DOCTYPE html><html><head><title>Checkout</title></head><body>
 <form action="/pay" method="POST">
-  <input type="hidden" name="precio" value="19.99">
-  <input type="hidden" name="descuento" value="0">
-  <input type="hidden" name="cantidad" value="1">
-  <input type="text" name="card"><button>Pagar</button>
+  <input type="hidden" name="price" value="19.99">
+  <input type="hidden" name="discount" value="0">
+  <input type="hidden" name="quantity" value="1">
+  <input type="text" name="card"><button>Pay</button>
 </form></body></html>"""
 
 LOGIN_HTML = """<!DOCTYPE html><html><head><title>Login</title></head><body>
 <form action="/login" method="POST"><input type="text" name="user">
-<input type="password" name="pass"><button>Entrar</button></form></body></html>"""
+<input type="password" name="pass"><button>Sign in</button></form></body></html>"""
 
 GRAPHQL_SCHEMA = json.dumps({"data": {"__schema": {"queryType": {"name": "Query"},
     "types": [{"name": "User", "fields": [{"name": "id"}, {"name": "email"}]},
@@ -123,7 +123,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 def main_test():
     server = Server(("127.0.0.1", PORT), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    print("Servidor vulnerable en http://127.0.0.1:%d/" % PORT)
+    print("Vulnerable server at http://127.0.0.1:%d/" % PORT)
     code = main([
         "-u", f"http://127.0.0.1:{PORT}",
         "--yes", "--no-color",

@@ -1,4 +1,4 @@
-"""Orquestador de auditorías: orquesta módulos, contexto y resultados."""
+"""Audit orchestrator: orchestrates modules, context and results."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .models import AuditResult, Finding, Severity
 from .modules.base import AuditModule
 from .utils import err, info, normalize_url, ok, warn
 
-# Registro de módulos
+# Module registry
 from .modules.apis import ApisModule
 from .modules.auth import AuthModule
 from .modules.cms import CmsModule
@@ -37,7 +37,7 @@ MODULES: List[Type[AuditModule]] = [
 ]
 @dataclass
 class AuditContext:
-    """Compartido por todos los módulos: HTTP, activos, hallazgos y log."""
+    """Shared by all modules: HTTP, assets, findings and log."""
 
     target: str
     config: AppConfig
@@ -50,7 +50,7 @@ class AuditContext:
         from .models import Severity
         from .utils import cprint
         module = kwargs.pop("module", "general")
-        title = kwargs.pop("title", "Hallazgo sin título")
+        title = kwargs.pop("title", "Finding without title")
         description = kwargs.pop("description", "")
         severity = kwargs.pop("severity", Severity.INFO)
         url = kwargs.pop("url", self.target)
@@ -73,7 +73,7 @@ class AuditContext:
 
 
 def run_audit(target: str, config: AppConfig) -> AuditResult:
-    """Ejecuta la auditoría completa y devuelve el resultado con informes."""
+    """Runs the full audit and returns the result with reports."""
     url = normalize_url(target)
     result = AuditResult(target=url)
     result.meta.update({
@@ -85,15 +85,15 @@ def run_audit(target: str, config: AppConfig) -> AuditResult:
     })
 
     http = HttpClient(config)
-    info("Petición inicial a " + url)
+    info("Initial request to " + url)
     base = http.get(url)
     if not base.status and base.error:
-        err(f"No se pudo conectar: {base.error}")
+        err(f"Could not connect: {base.error}")
         result.meta["error"] = base.error
         result.finalize()
         return result
     if base.status >= 400 and not config.active_checks:
-        warn(f"El objetivo respondió con estado HTTP {base.status} ({base.reason}).")
+        warn(f"The target responded with HTTP status {base.status} ({base.reason}).")
 
     ctx = AuditContext(target=url, config=config, http=http, base=base)
     ctx.assets["target"] = url
@@ -107,7 +107,7 @@ def run_audit(target: str, config: AppConfig) -> AuditResult:
     ctx.assets["ports"] = []
     ctx.assets["cookies_analyzed"] = []
 
-    info(f"Objetivo accesible · {len(base.body)} bytes · status {base.status}")
+    info(f"Target accessible · {len(base.body)} bytes · status {base.status}")
 
     requested = set(config.module_include) or {m.name for m in MODULES}
     excluded = set(config.module_exclude)
@@ -120,19 +120,19 @@ def run_audit(target: str, config: AppConfig) -> AuditResult:
             continue
 
         start = time.monotonic()
-        info(f"Fase [{cls.name}] — {cls.description}")
+        info(f"Phase [{cls.name}] — {cls.description}")
         try:
             cls(ctx).run()
         except Exception as exc:
-            err(f"El módulo '{cls.name}' falló: {exc}")
+            err(f"Module '{cls.name}' failed: {exc}")
             if config.active_checks:
                 warn(traceback.format_exc(limit=4))
         elapsed = time.monotonic() - start
-        ok(f"{cls.name} completado en {elapsed:.2f}s")
+        ok(f"{cls.name} completed in {elapsed:.2f}s")
 
     result.findings = ctx.findings
     result.assets = ctx.assets
     result.finalize()
 
-    info(f"Hallazgos: {sum(result.summary.values())} · Puntuación de riesgo: {result.risk_score}/100")
+    info(f"Findings: {sum(result.summary.values())} · Risk score: {result.risk_score}/100")
     return result

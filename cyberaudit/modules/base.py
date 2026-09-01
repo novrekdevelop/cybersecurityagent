@@ -1,4 +1,4 @@
-"""Módulo base para todos los plugins de análisis."""
+"""Base module for all analysis plugins."""
 
 from __future__ import annotations
 
@@ -6,18 +6,18 @@ from typing import Any, Dict
 
 
 class AuditModule:
-    """Clase base. Cada módulo inspecciona un área de la superficie de ataque.
+    """Base class. Each module inspects an area of the attack surface.
 
-    El contexto (ctx) expone:
+    The context (ctx) exposes:
       - ctx.http:       HttpClient
       - ctx.config:     AppConfig
-      - ctx.target:     URL objetivo normalizada
-      - ctx.origin:     origen (esquema+host+puerto)
-      - ctx.base:       HttpResponse de la petición inicial
-      - ctx.assets:     dict acumulador de activos descubiertos
-      - ctx.findings:   lista para registrar hallazgos
-      - ctx.add_finding(): crea y añade un Finding
-      - ctx.log(mensaje, color): salida de consola
+      - ctx.target:     normalized target URL
+      - ctx.origin:     origin (scheme+host+port)
+      - ctx.base:       HttpResponse of the initial request
+      - ctx.assets:     dict accumulator of discovered assets
+      - ctx.findings:   list to register findings
+      - ctx.add_finding(): creates and adds a Finding
+      - ctx.log(message, color): console output
     """
 
     name: str = "base"

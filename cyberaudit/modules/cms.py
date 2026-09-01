@@ -1,9 +1,9 @@
-"""Enumeración profunda de CMS cuando la huella tecnológica identifica uno.
+"""Deep CMS enumeration when the technology fingerprint identifies one.
 
-Para WordPress / Drupal / Joomla / PrestaShop, un auditor profesional ejecuta
-controles específicos del gestor de contenidos: enumeración de usuarios,
-API REST expuesta, ficheros de versión, XML-RPC y paneles. Todos los probes
-son GET benignos, acotados (≤9 peticiones) y solo se lanzan si el CMS fue
+For WordPress / Drupal / Joomla / PrestaShop,a professional auditor runs
+CMS-specific checks: user enumeration,
+exposed REST API, version files, XML-RPC and panels. All probes
+are benign,bounded GETs (≤9 requests( and only run if the CMS was
 detectado.
 """
 
@@ -25,7 +25,7 @@ PRESTASHOP_MARKERS = re.compile(r"prestashop|/modules/", re.I)
 
 class CmsModule(AuditModule):
     name = "cms"
-    description = "Enumeración de CMS (WordPress/Drupal/Joomla/PrestaShop)"
+    description = "CMS enumeration (WordPress/Drupal/Joomla/PrestaShop)"
 
     def run(self):
         techs = [t.get("name", "") for t in self.assets.get("tech", [])]
@@ -48,7 +48,7 @@ class CmsModule(AuditModule):
     def _wordpress(self):
         base = self.ctx.base.url or self.ctx.target
         origin = origin_of(base)
-        info("CMS detectado: WordPress — enumerando superficie específica…")
+        info("CMS detected: WordPress — enumerating specific surface…")
         self.assets["cms"] = "wordpress"
         http = self.ctx.http
 
@@ -56,9 +56,9 @@ class CmsModule(AuditModule):
         rest = http.get(urljoin(origin + "/", "wp-json/"))
         if rest.ok and "json" in rest.header("content-type"):
             self.register(
-                title="WordPress REST API expuesta",
-                description="El endpoint /wp-json/ responde públicamente; expone esquemas, "
-                            "autores en posts y, según configuración, acciones vía API.",
+                title="WordPress REST API exposed",
+                description="The /wp-json/ endpoint responds publicly; it exposes schemas, "
+                            "authors in postsand, depending on configuration, actions via the API.",
                 severity=Severity.LOW, cwe="CWE-200", owasp="A05:2021", url=rest.url,
                 evidence=rest.text[:200],
                 remediation="Bloquea wp-json si no lo necesitas o protégelo por "
@@ -77,14 +77,14 @@ class CmsModule(AuditModule):
                 rows = []
         if rows:
             self.register(
-                title="Enumeración de usuarios WordPress por REST API",
-                description="GET /wp-json/wp/v2/users revela los nombres de usuario, "
-                            "clave previa a ataques de fuerza bruta y phishing dirigido.",
+                title="WordPress user enumeration via REST API",
+                description="GET /wp-json/wp/v2/users reveals the usernames, "
+                            "a key prerequisite for brute-force attacksand targeted phishing.",
                 severity=Severity.HIGH, cwe="CWE-200", owasp="A05:2021", url=users.url,
                 evidence="\n".join(f"{u['slug'] or '?'} ({u['name'] or '?'}) {u['link'] or ''}"
                                    for u in rows[:12]),
-                remediation="Desactiva /wp-json/wp/v2/users y oculta los autores en las "
-                            "publicaciones.")
+                remediation="Disable /wp-json/wp/v2/usersand hide the authors in the "
+                            "posts.")
 
         # Enumeración de autores ?author=N
         for n in (1, 2):
@@ -93,11 +93,11 @@ class CmsModule(AuditModule):
             m = re.search(r"/author/([^/]+)", loc)
             if r.status in (301, 302, 303, 307, 308) and m:
                 self.register(
-                    title="Enumeración de usuarios WordPress por ?author=N",
-                    description="?author=1 devuelve un redirect a /author/<usuario>, "
-                                "confirmando el nombre de login del primer usuario.",
+                    title="WordPress user enumeration via ?author=N",
+                    description="?author=1 returns aredirect to /author/<user>, "
+                                "confirming the login name ofthe first user.",
                     severity=Severity.MEDIUM, cwe="CWE-200", owasp="A05:2021", url=loc,
-                    evidence=f"?author={n} -> {loc} (usuario: {m.group(1)})",
+                    evidence=f"?author={n} -> {loc} (user: {m.group(1)})",
                     remediation="Restringe el patrón de autor; usa plugins que oculten "
                                 "el autor en la URL.")
                 break
@@ -107,29 +107,29 @@ class CmsModule(AuditModule):
         if readme.ok and "wordpress" in readme.text[:500].lower():
             v = re.search(r"Version\s+([0-9.]+)", readme.text[:3000])
             self.register(
-                title="readme.html accesible (versión de WordPress revelada)",
-                description="El fichero readme.html público permite conocer la versión "
-                            "exacta y buscar exploits." + (f" Versión: {v.group(1)}." if v else ""),
+                title="readme.html accessible (WordPress version disclosed)",
+                description="The public readme.html file reveals the exact version "
+                            "and helps find exploits." + (f" Version: {v.group(1)}." if v else ""),
                 severity=Severity.MEDIUM, cwe="CWE-200", owasp="A05:2021", url=readme.url,
                 evidence=(f"Version: {v.group(1)}" if v else readme.text[:120]),
-                remediation="Elimina readme.html y evita revelar la versión.")
+                remediation="Remove readme.htmland avoid disclosing the version.")
 
         # xmlrpc.php
         xmlrpc = http.get(urljoin(origin + "/", "xmlrpc.php"))
         if xmlrpc.ok and "XML-RPC" in xmlrpc.text[:200]:
             self.register(
-                title="xmlrpc.php habilitado (amplificación y pingback)",
+                title="xmlrpc.php enabled (amplificationand pingback)",
                 description="XML-RPC permite fuerza bruta amplificada (system.multicall), "
-                            "pingbacks (SSRF) y DDoS de reflexión.",
+                            "pingbacks (SSRF)and reflection DDoS.",
                 severity=Severity.MEDIUM, cwe="CWE-400", owasp="A05:2021", url=xmlrpc.url,
                 evidence=xmlrpc.text[:120],
-                remediation="Desactiva XML-RPC salvo que un plugin lo requiera.")
+                remediation="Disable XML-RPC unless a plugin requires it.")
 
     # ------------------------------------------------------------------ drupal
     def _drupal(self):
         base = self.ctx.base.url or self.ctx.target
         origin = origin_of(base)
-        info("CMS detectado: Drupal — enumerando superficie específica…")
+        info("CMS detected: Drupal — enumerating specific surface…")
         self.assets["cms"] = "drupal"
         http = self.ctx.http
         for path in ("CHANGELOG.txt", "core/CHANGELOG.txt"):
@@ -137,36 +137,36 @@ class CmsModule(AuditModule):
             if r.ok and r.text:
                 v = re.search(r"Drupal\s+([0-9.]+)", r.text[:3000])
                 self.register(
-                    title="Fichero CHANGELOG de Drupal accesible",
-                    description="El changelog público revela la versión de Drupal exacta, "
-                                "permitiendo buscar vulnerabilidades conocidas."
+                    title="Drupal CHANGELOG file accessible",
+                    description="The public changelog reveals the exact Drupal version, "
+                                "allowing known vulnerabilities to be found."
                                 + (f" Versión: {v.group(1)}." if v else ""),
                     severity=Severity.MEDIUM, cwe="CWE-200", owasp="A05:2021", url=r.url,
                     evidence=(f"Version: {v.group(1)}" if v else r.text[:120]),
-                    remediation="Borra CHANGELOG.txt de la raíz pública o bloquea su acceso.")
+                    remediation="Remove CHANGELOG.txtfrom the public root or block its access.")
                 break
 
     # ------------------------------------------------------------------ joomla
     def _joomla(self):
         base = self.ctx.base.url or self.ctx.target
         origin = origin_of(base)
-        info("CMS detectado: Joomla — enumerando superficie específica…")
+        info("CMS detected: Joomla — enumerating specific surface…")
         self.assets["cms"] = "joomla"
         http = self.ctx.http
         r = http.get(urljoin(origin + "/", "administrator/"))
         if r.status == 200 and r.text:
             self.register(
-                title="Panel de administración de Joomla accesible",
-                description="El panel /administrator/ de Joomla responde 200; es el "
-                            "objetivo principal de ataques de fuerza bruta.",
+                title="Joomla admin panel accessible",
+                description="The /administrator/ Joomla panel responds 200; it is the "
+                            "main target for brute-force attacks.",
                 severity=Severity.MEDIUM, cwe="CWE-306", owasp="A07:2021", url=r.url,
                 evidence=f"HTTP {r.status} · {len(r.body)} bytes",
-                remediation="Protege el panel con MFA, bloqueo de intentos y allowlist de IPs.")
+                remediation="Protect the panel with MFA, login attempt lockoutand IP allowlist.")
 
     # ------------------------------------------------------------------ prestashop
     def _prestashop(self):
         base = self.ctx.base.url or self.ctx.target
         origin = origin_of(base)
-        info("CMS detectado: PrestaShop — enumerando superficie específica…")
+        info("CMS detected: PrestaShop — enumerating specific surface…")
         self.assets["cms"] = "prestashop"
         # (la enumeración específica de PrestaShop puede ampliarse aquí)

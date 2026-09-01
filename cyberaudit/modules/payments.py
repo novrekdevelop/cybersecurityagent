@@ -1,12 +1,12 @@
-"""Análisis de flujo de pagos: pasarelas, secretos y lógica de negocio.
+"""Payment flow analysis: gateways, secretsand business logic.
 
-Detecta:
+It detects:
 - Pasarelas de pago usadas (Stripe, PayPal, MercadoPago, Redsys…).
 - Claves públicas/secretas filtradas en el cliente (sk_live, pk_…, · secret).
 - Cálculo de importes en JavaScript (vector clásico de manipulación de pago).
 - Campos ocultos manipulables (precio, descuento, cantidad, envío).
-- Endpoints de checkout/pago y si van por HTTP o sin CSRF.
-Todo es pasivo/sin modificar flujos de pago.
+- Checkout/payment endpointsand whether they go over HTTP or without CSRF.
+Everything is passive/without modifying payment flows.
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ HIDDEN_BIZ_RE = re.compile(
 
 class PaymentsModule(AuditModule):
     name = "payments"
-    description = "Pasarelas de pago, secretos filtrados y lógica de precios"
+    description = "Payment gateways, leaked secretsand pricing logic"
 
     def run(self):
         self._seen_keys: Set[str] = set()
@@ -88,60 +88,60 @@ class PaymentsModule(AuditModule):
         found = [g for g, rx in GATEWAY_PATTERNS.items() if rx.search(haystack)]
         self.assets["payment_gateways"] = found
         if found:
-            self.log("Pasarelas detectadas: " + ", ".join(found))
+            self.log("Gateways detected: " + ", ".join(found))
             for g in found[:4]:
-                pass  # la presencia de la pasarela en sí no es un hallazgo
+                pass  # the presence of the gateway itself is not a finding
 
     def _detect_secrets(self, haystack):
         m = SECRET_KEY_RE.search(haystack)
         if m:
             self.register(
-                title="Clave SECRETA de pasarela de pago expuesta en el cliente",
+                title="Payment gateway SECRET key exposed in the client",
                 description=f"Se encontró '{m.group(0)[:24]}…' en código visible al "
-                            "navegador. Es la clave de servidor: permite crear cobros, "
-                            "reembolsos o leer operaciones si se cae en manos de terceros.",
+                            "browser. It is the server key: it allows creating charges, "
+                            "refunds o reading operations ifit falls into third-party hands.",
                 severity=Severity.CRITICAL, cwe="CWE-798", owasp="A07:2021",
                 url=self.ctx.target, evidence=m.group(0)[:80],
-                remediation="Rota la clave inmediatamente, muévela al backend y revócala.")
+                remediation="Rotate the key immediately, move it tothe backendand revoke it.")
             return
         m = GENERIC_SECRET_RE.search(haystack)
         if m:
             self.register(
-                title="Posible secreto de integración de pago en el cliente",
+                title="Possible payment integration secret in the client",
                 description="Un valor con nombre de secreto de integración aparece en "
                             "HTML/JS cliente: client_secret, secret_key, firma…",
                 severity=Severity.HIGH, cwe="CWE-798", owasp="A07:2021",
                 url=self.ctx.target, evidence=m.group(0)[:120],
-                remediation="Revisa y rota el secreto; mantén estos valores solo en el "
-                            "servidor.")
+                remediation="Reviewandrotate the secret; keep these values only on the "
+                            "server.")
         elif PUBLIC_KEY_RE.search(haystack):
-            self.log("Se detectaron claves públicas de pago (pk_) — no son secretas.")
+            self.log("Public payment keys detected (pk_) — they are not secrets.")
 
     def _detect_client_prices(self, haystack):
         calc = PRICE_CALC_RE.findall(haystack)
         assign = CLIENT_PRICE_RE.findall(haystack)
         if calc:
             self.register(
-                title="Cálculo de importe de pago realizado en JavaScript",
-                description="El precio/importe se calcula en el cliente con operaciones "
-                            "como 'precio*qty' o 'total='. Si el servidor confía en el "
-                            "valor recibido, un atacante puede cambiar el total a 0.01 "
-                            "o negativo y saltarse la pasarela de pago.",
+                title="Payment amount calculation done in JavaScript",
+                description="The price/amount is calculated in the client with operations "
+                            "like 'price*qty' or 'total='. Ifthe server trusts the "
+                            "received value, an attacker can change the total to 0.01 "
+                            "or negativeand skip the payment gateway.",
                 severity=Severity.CRITICAL if calc else Severity.HIGH,
                 cwe="CWE-840", owasp="A01:2021", url=self.ctx.target,
                 evidence=calc[0][:160],
-                remediation="Recalcula SIEMPRE el importe en el servidor desde precio "
-                            "almacenado; nunca confíes en el total del cliente.")
+                remediation="ALWAYS recalculate the amount on the server from stored "
+                            "price; never trust the client total.")
         elif assign:
             self.register(
-                title="Importe del pago asignado en el cliente",
-                description="Se asignan valores de importe/total en código de cliente "
-                            "que se envían al servidor. Verifica que el backend los "
-                            "recalcule desde BD.",
+                title="Payment amount assignedin the client",
+                description="Amount/total values are assignedin client code "
+                            "and sent tothe server. Verify that the backend "
+                            "recalculates them from DB.",
                 severity=Severity.HIGH, cwe="CWE-840", owasp="A01:2021",
                 url=self.ctx.target, evidence=assign[0][:160],
-                remediation="Usa precios/catálogo del servidor y valida cantidades e "
-                            "importe en el backend.")
+                remediation="Use server-side prices/catalogand validate quantitiesand "
+                            "amount on the backend.")
 
     # ------------------------------------------------------------------ campos ocultos
     def _detect_hidden_fields(self, pages):
@@ -150,16 +150,16 @@ class PaymentsModule(AuditModule):
             m = HIDDEN_BIZ_RE.search(html)
             if m and self._seen("h|" + m.group(1) + "|" + page["url"]):
                 self.register(
-                    title=f"Campo oculto de negocio manipulable: '{m.group(1)}'",
-                    description="El checkout incluye un input hidden con un valor de "
-                                "precio/importe/descuento/cantidad que se envía al "
-                                "servidor. Cambiándolo en el cliente podría alterarse "
-                                "el total cobrado si no hay revalidación.",
+                    title=f"Manipulable hidden business field: '{m.group(1)}'",
+                    description="The checkout includes a hidden input with a "
+                                "price/amount/discount/quantity value that is sent tothe "
+                                "server. Changing it in the client could alter "
+                                "the charged total ifthere is no revalidation.",
                     severity=Severity.HIGH, cwe="CWE-840", owasp="A01:2021",
                     url=page["url"], evidence=m.group(0)[:200],
-                    remediation="No uses campos ocultos editables para negocio; "
-                                "recalcula importe y descuentos en el servidor "
-                                "desde la fuente autorizada.")
+                    remediation="Do not use editable hidden fields for business; "
+                                "recalculate amountand discounts on the server "
+                                "from the authorized source.")
 
     def _seen(self, key: str) -> bool:
         if key in self._seen_keys:
@@ -185,22 +185,22 @@ class PaymentsModule(AuditModule):
                 if action.startswith("http://") and secure:
                     self.register(
                         title="Envío de datos de pago por HTTP (en claro)",
-                        description="Los datos del checkout viajan sin cifrar; tarjetas, "
-                                    "importes y cupones quedan expuestos a MITM.",
+                        description="Checkout data travels unencrypted; cards, "
+                                    "amountsand coupons are exposed to MITM.",
                         severity=Severity.CRITICAL, cwe="CWE-319", owasp="A02:2021",
                         url=url, evidence=f"action={action}",
-                        remediation="Sirve el endpoint de pago exclusivamente por HTTPS.")
+                        remediation="Serve the payment endpoint exclusively over HTTPS.")
                 # Sin token CSRF en el formulario de pago
                 fields = form.get("fields", [])
                 has_csrf = any(f.get("name") and re.search(
                     r"csrf|token|authenticity|xsrf", f.get("name", ""), re.I) for f in fields)
                 if not has_csrf and self._seen("cs|" + url):
                     self.register(
-                        title="Formulario de pago sin token CSRF",
-                        description="El checkout no incluye token anti-CSRF; un atacante "
-                                    "puede forzar pedidos o cambios de datos de facturación "
-                                    "en nombre de la víctima.",
+                        title="Payment form without CSRF token",
+                        description="The checkout does not include an anti-CSRF token; an "
+                                    "attacker can force orders or billing data changes "
+                                    "on behalf of the victim.",
                         severity=Severity.MEDIUM, cwe="CWE-352", owasp="A01:2021",
                         url=url, evidence=f"action={action}",
-                        remediation="Añade tokens CSRF por sesión en el checkout y valida "
-                                    "en el backend.")
+                        remediation="Add per-session CSRF tokensin the checkoutand validate "
+                                    "them on the backend.")

@@ -1,8 +1,8 @@
-"""CyberAudit Pro — Framework profesional de auditoría y análisis de seguridad web.
+"""CyberAudit Pro — Professional web security audit and analysis framework.
 
-Uso autorizado solamente: audita sistemas cuyo propietario te haya otorgado
-permiso expreso por escrito. El uso no autorizado puede ser ilegal.
+Authorized use only: audit systems whose owner has granted you express
+written permission. Unauthorized use may be illegal.
 """
 
 __version__ = "2.0.0"
-__título__ = "CyberAudit Pro"
+__title__ = "CyberAudit Pro"

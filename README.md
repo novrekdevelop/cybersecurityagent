@@ -1,117 +1,119 @@
 # 🔒 CyberAudit Pro
 
-**Framework profesional de auditoría y análisis de seguridad web.**  
-Diseñado para ingenieros/as de ciberseguridad: **rebusca** en todos los rincones de una
-web — cabeceras, cookies, TLS, DNS, subdominios, HTML, JavaScript, formularios, pagos,
-paneles de administración, archivos sensibles y servicios expuestos — y genera informes
-ejecutivos de alta calidad (HTML / Markdown / JSON).
+**Professional web security auditing and analysis framework.**
+Designed for cybersecurity engineers:it **probes** every corner of a
+web — headers, cookies, TLS, DNS, subdomains, HTML, JavaScript, forms, payments,
+admin panels, sensitive filesand exposed services —and generates executive
+high-quality reports(HTML / Markdown / JSON).
 
-> #### ⚠️ Aviso legal obligatorio
-> Esta herramienta debe usarse **exclusivamente** sobre sistemas de tu propiedad o con
-> **autorización expresa por escrito** del propietario. El escaneo o la explotación no
-> autorizados pueden constituir delito (en España, art. 197 *bis* del Código Penal;
-> Directiva UE 2013/40 y equivalente en cada país). El autor no se responsabiliza del
-> mal uso que se le dé a esta herramienta.
+> #### ⚠️ Mandatory legal notice
+> This tool must be used **exclusively** against systems you own or with
+> **express written authorization** from the owner. Unauthorized scanning or exploitation
+> may constitute a crime(in Spain, art. 197 *bis* of the Penal Code;
+> EU Directive 2013/40 and equivalent in each country). The author is not responsible for
+> misuse of this tool.
 
 ---
 
-## 📥 Descargar y usar
+## 📥 Download and usage
 
 ```bash
-# 1. Clona el repositorio
+# 1. Clone the repository
 git clone https://github.com/danielsonn2009-svg/agentedeciberseguridad.git
 cd agentedeciberseguridad
 
-# 2. Verifica instalación (solo necesita Python 3.10+, sin dependencias externas)
+# 2. Verify the installation(only needs Python 3.10+, no external dependencies)
 python main.py --about
 ```
 
-En **Windows** puedes ejecutar directamente `run.bat` para abrir el menú interactivo.
-La carpeta `test_site/` incluye un laboratorio local de práctica para probar el
-escáner sin salir de tu máquina.
+On **Windows** you can run `run.bat` directly to open the interactive menu.
+ The
+`test_site/` folder includes a local practice lab to test the
+scanner without leaving your machine.
 
 ---
 
-## 🚀 Inicio rápido
+## 🚀 Quick start
 
 ```powershell
-# Auditoría completa (recomendado si el propietario autoriza)
-python main.py -u https://tudominio.com --yes
+# Full audit (recommended if the owner authorizes)
+python main.py -u https://yourdomain.com --yes
 
-# Solo chequeo rápido de cabeceras y contenido
-python main.py -u https://tudominio.com --yes --no-recon --no-tls --no-directories --no-ports
+# Only a quick check of headersand content
+python main.py -u https://yourdomain.com --yes --no-recon --no-tls --no-directories --no-ports
 
-# Auditoría completa + escaneo de puertos + pruebas de reflexión benignas
-python main.py -u https://tudominio.com --yes --ports --active
+# Full audit + port scanning + benign reflection tests
+python main.py -u https://yourdomain.com --yes --ports --active
 
-# Informes sólamente JSON
-python main.py -u https://tudominio.com --yes -f json
+# JSON-only reports
+python main.py -u https://yourdomain.com --yes -f json
 
-# Wordlist propia para descubrir rutas
-python main.py -u https://tudominio.com --yes --wordlist rutas.txt --max-requests 500
+# Your own wordlist to discover paths
+python main.py -u https://yourdomain.com --yes --wordlist routes.txt --max-requests 500
 
-# Listar los módulos disponibles
+# List the available modules
 python main.py --about
 ```
 
-Los informes se guardan en `reports/` con marca de tiempo.
+Reports are saved in `reports/` with a timestamp.
 
 ---
 
-## 🧩 Módulos de análisis
+## 🧩 Analysis modules
 
-| Módulo | Qué detecta | OWASP |
+| Module | What it detects | OWASP |
 |--------|-------------|-------|
-| `recon` | DNS (A/AAAA/MX/NS/TXT vía DoH), WHOIS/RDAP, subdominios vía transparencia de certificados (crt.sh), huella tecnológica (≈60 tecnologías) | — |
-| `osint` | **Inteligencia pasiva externa**: Shodan InternetDB por IP (puertos históricos, CPEs y **CVEs conocidos**), detección de **WAF/CDN** del borde (Cloudflare, Incapsula, Akamai, Vercel…) | A06 |
-| `emailsec` | **Postura de correo anti-suplantación**: SPF (`-all` estricto vs `~all`/`+all`), selectores DKIM, DMARC (`p=` none/quarantine/reject) y MX — 100% pasivo vía DNS | A04 |
-| `tls` | Caducidad/autofirma/SAN del certificado, TLS 1.0/1.1 obsoletos, ciphers negociados | A02 |
-| `headers` | HSTS, CSP (incl. unsafe-inline), clickjacking, nosniff, Referrer-Policy, Permissions-Policy, CORS, banners de servidor, flags de cookies (Secure/HttpOnly/SameSite) | A02/A01/A05 |
-| `content` | Crawler del mismo origen; secretos incrustados en JS; sinks peligrosos (eval, innerHTML…); contenido mixto; scripts de terceros sin SRI; **formularios de login sin CSRF**, envío de credenciales por GET/HTTP; **campos ocultos de precio/rol/cupón (manipulación de lógica de negocio)**; subida de archivos; emails y comentarios filtrados | A03/A01/A07/A08 |
-| `injection` | Fugas de errores de BD (MySQL/PG/Oracle/Java…), parámetros de interés (id, file, url…), y —con `--active`— **pruebas de reflexión benignas** (XSS) usando un marcador inofensivo | A03 |
-| `directories` | Fuerza bruta de rutas (≈175 incorporadas) con hilos: `.git`, `.env`, `actuator`, backups, `wp-config`, `phpinfo`, paneles (401/403/200), robots.txt/security.txt, listados de directorio | A05/A01 |
-| `cms` | **Enumeración de CMS** con huella WordPress/Drupal/Joomla/PrestaShop: REST API, usuarios (`wp-json/v2/users`, `?author=N`), `readme.html`/CHANGELOG con versión, `xmlrpc.php`, paneles | A05/A07 |
-| `apis` | **Descubrimiento de APIs**: extrae endpoints del JS/HTML, fuzzing de rutas `/api`, `/v1`, `/graphql`, `/actuator`…; detecta **APIs sin autenticación**, datos sensibles expuestos, GraphQL introspection, CORS abierto, errores verbosos | A01/A05 |
-| `auth` | **Bypass de login**: rate limiting del login, credenciales enviadas a dominios externos o por GET/HTTP, **tokens/JWT en URLs y en localStorage** (XSS → robo de sesión), política de contraseñas débil, **open redirect** en el flujo de autenticación (sonda benigna) | A07/A01/A03 |
-| `payments` | **Fraude/pagos**: pasarelas detectadas (Stripe, PayPal, MercadoPago, Redsys…), **claves secretas de pago filtradas en el cliente** (`sk_live`, `client_secret`), **cálculo de importes en JS** (vector de manipulación del total cobrado), campos ocultos de precio/descuento/cantidad manipulables, checkout en HTTP o sin CSRF | A01/A07/A02 |
-| `fuzzer` *(con `--fuzz-login`)* | Prueba acotada de **credenciales por defecto** (admin/admin, root/toor…) en el login con pausas y límite; activable solo explícitamente | A07 |
-| `cves` | Analiza `package.json`/`composer.lock`/`requirements.txt` del origen y consulta **CVEs públicos (OSV.dev)** de cada dependencia | A06 |
+| `recon` | DNS (A/AAAA/MX/NS/TXT via DoH), WHOIS/RDAP, subdomains via certificate transparency(crt.sh, technology fingerprint(≈60 technologies) | — |
+| `osint` | **Passive external intelligence**: Shodan InternetDB by IP (historical ports, CPEs and **known CVEs**), edge **WAF/CDN** detection(Cloudflare, Incapsula, Akamai, Vercel…) | A06 |
+| `emailsec` | **Anti-spoofing email posture**: SPF (`-all` strict vs `~all`/`+all`), DKIM selectors, DMARC (`p=` none/quarantine/reject) and MX — 100% passive via DNS | A04 |
+| `tls` | Certificate expiry/self-signed/SAN, obsolete TLS 1.0/1.1, negotiated ciphers | A02 |
+| `headers` | HSTS, CSP (incl. unsafe-inline), clickjacking,nosniff, Referrer-Policy, Permissions-Policy, CORS, server banners, cookie flags(Secure/HttpOnly/SameSite) | A02/A01/A05 |
+| `content` | Same-origin crawler;; embedded secrets in JS;; dangerous sinks(eval, innerHTML…); mixed content;; third-party scripts without SRI;; **login forms without CSRF**, credentials sent by GET/HTTP;; **hidden price/role/coupon fields(business logic manipulation)**; file upload;; filtered emailsand comments | A03/A01/A07/A08 |
+| `injection` | Database error leaks(MySQL/PG/Oracle/Java…), interesting parameters(id, file, url…),and —with `--active`— **benign reflection tests**(XSS) using a harmless marker | A03 |
+| `directories` | Path brute force(≈175 built-in)with threads: `.git`, `.env`, `actuator`, backups, `wp-config`, `phpinfo`, panels(401/403/200), robots.txt/security.txt, directory listings | A05/A01 |
+| `cms` | **CMS enumeration** with WordPress/Drupal/Joomla/PrestaShop fingerprint: REST API, users(`wp-json/v2/users`, `?author=N`), `readme.html`/CHANGELOG with version, `xmlrpc.php`, panels | A05/A07 |
+| `apis` | **API discovery**: extracts endpoints from JS/HTML, path fuzzing `/api`, `/v1`, `/graphql`, `/actuator`…; detects **unauthenticated APIs**, exposed sensitive data, GraphQL introspection, open CORS, verbose errors | A01/A05 |
+| `auth` | **Login bypass**: login rate limiting, credentials sent to external domains or by GET/HTTP, **tokens/JWT in URLsand in localStorage**(XSS → session theft), weak password policy, **open redirect** in the authentication flow(benign probe) | A07/A01/A03 |
+| `payments` | **Fraud/payments**: detected gateways(Stripe, PayPal, MercadoPago, Redsys…), **secret payment keys leaked in the client**(`sk_live`, `client_secret`), **amount calculation in JS**(manipulation vector of the charged total), manipulable hidden price/discount/quantity fields, checkout on HTTP or without CSRF | A01/A07/A02 |
+| `fuzzer` *(with `--fuzz-login`)* | Bounded **default credential** test(admin/admin, root/toor…)on the login with pausesand limit; only explicitly activable | A07 |
+| `cves` | Analyzes `package.json`/`composer.lock`/`requirements.txt` of the originand queries **public CVEs(OSV.dev)** for each dependency | A06 |
 
-**Además:** el rastreador lee `sitemap.xml`/`robots.txt` y descarga los **JS del mismo origen**; `apis` consulta el **Wayback Machine** por endpoints históricos; `recon` detecta **subdomain takeover** (CNAME colgante) y WAFs; `headers` prueba **métodos HTTP (TRACE→XST)**; `auth` **decodifica JWTs** del cliente (alg=none, claims sensibles, HMAC débil); `osint` añade a cada IP pública los **CVEs históricos de Shodan** y `emailsec` revisa el **anti-spoofing** del dominio.
-| `ports` | Escaneo TCP no intrusivo (≈30 puertos), banners, detección de servicios de datos expuestos (MySQL, MongoDB, Redis, Elastic…), SSH/RDP/Telnet públicos | A05/A07 |
+**Also:**the crawler reads `sitemap.xml`/`robots.txt`and downloads same-origin **JS**;`apis` queries the **Wayback Machine** for historical endpoints; `recon` detects **subdomain takeover** (dangling CNAME)and WAFs; `headers` tests **HTTP methods(TRACE→XST)**; `auth` **decodes JWTs** from the client(alg=none, sensitive claims, weak HMAC); `osint` addsfor each public IP the **historical Shodan CVEs** and `emailsec` reviews the domain's **anti-spoofing** posture.
+| `ports` | Non-intrusive TCP scanning(≈30 ports], banners, detection of exposed data services(MySQL, MongoDB, Redis, Elastic…], public SSH/RDP/Telnet | A05/A07 |
 
-Los informes (JSON/MD/HTML/CSV/SARIF) incluyen además **cobertura del OWASP Top 10** por categoría y una **hoja de ruta de remediación** ejecutiva numerada, junto al impacto económico estimado por hallazgo.
+The reports(JSON/MD/HTML/CSV/SARIF) also include **OWASP Top 10 coverage** bye category anda numbered executive **remediation roadmap**, together with the estimated economic impact bye finding.
+---
 
-## ⚙️ Opciones principales
+## ⚙️ Main options
 
-| Opción | Descripción |
+| Option | Description |
 |--------|-------------|
-| `-u/--url` | URL objetivo (se añade `https://` si falta) |
-| `-l --list fichero` | **Audita varias URLs** de un fichero (una por línea, `#` para comentar) con resumen consolidado |
-| `--yes` | Acepta el aviso de autorización (modo no interactivo) |
-| `--cookie` | Cookie de sesión (`--cookie "session=abc"`) para **escaneo autentificado** |
-| `--header 'X: y'` | Cabecera extra repetible (tokens, Basic auth…) para escaneo autentificado |
-| `--active` | Pruebas benignas de reflexión (marcador XSS sin payload, open redirect, GraphQL) |
-| `--delay 0.5` | Pausa entre peticiones (modo cortesía/stealth); `--random-delay` añade jitter |
-| `--ports` | Activa el escaneo de puertos TCP |
-| `--fuzz-login` | **Prueba credenciales por defecto** en el login (lista acotada, solo autorizado) |
-| `--subdomains` | Prueba además una wordlist de subdominios comunes (con **detección de subdomain takeover**) |
-| `--proxy` | Proxy HTTP/S (p. ej. `--proxy http://127.0.0.1:8080`) |
-| `--insecure` | No verifica certificados TLS |
-| `--wordlist` | Wordlist de rutas personalizada (una por línea) |
-| `-f json md html csv sarif` | Formatos de informe (SARIF usable en GHAS/Semgrep/VSCode; CSV en hojas de cálculo) |
-| `-o carpeta` | Carpeta de salida (por defecto `reports/`) |
-| `--include recon tls` / `--exclude …` | Selección de módulos |
-| `--no-<modulo>` | Desactivar un módulo (p. ej. `--no-ports`, `--no-osint`, `--no-emailsec`, `--no-cms`) |
-| `--config` | Config JSON alternativa |
-| `--max-pages`, `--depth`, `--concurrency`, `--timeout` | Límites y rendimiento |
+| `-u/--url` | Target URL(`https://` is added if missing) |
+| `-l --list file` | **Audits several URLs** from a file(one per line, `#` for comments)with consolidated summary |
+| `--yes` | Accepts the authorization notice(non-interactive mode) |
+| `--cookie` | Session cookie(`--cookie "session=abc"`)for **authenticated scanning** |
+| `--header 'X: y'` | Extra repeatable header(tokens, Basic auth…)for authenticated scanning |
+| `--active` | Benign reflection tests(XSS marker without payload, open redirect, GraphQL) |
+| `--delay 0.5` | Pause between requests(courtesy/stealth mode); `--random-delay` adds jitter |
+| `--ports` | Enables TCP port scanning |
+| `--fuzz-login` | **Tests default credentials**on the login(bounded list, authorized only) |
+| `--subdomains` | Also tests a wordlist of common subdomains(with **subdomain takeover detection**) |
+| `--proxy` | HTTP/S proxy(e.g. `--proxy http://127.0.0.1:8080`) |
+| `--insecure` | Does not verify TLS certificates |
+| `--wordlist` | Custom path wordlist(one per line) |
+| `-f json md html csv sarif` | Report formats(SARIF usable in GHAS/Semgrep/VSCode; CSV in spreadsheets) |
+| `-o folder` | Output folder(default `reports/`) |
+| `--include recon tls` / `--exclude …` | Module selection |
+| `--no-<module>` | Disable a module(e.g. `--no-ports`, `--no-osint`, `--no-emailsec`, `--no-cms`) |
+| `--config` | Alternative JSON config |
+| `--max-pages`, `--depth`, `--concurrency`, `--timeout` | Limitsand performance |
 
-Toda la configuración persistente vive en `config.json` (proxy, límites, formatos…).
+All persistent configuration lives in `config.json`(proxy, limits, formats…)。
 
 ---
 
-## 📄 Licencia
+## 📄 License
 
-Proyecto publicado bajo licencia **MIT** (ver `LICENSE`): puedes descargarlo,
-usarlo, modificarlo y compartirlo libremente, manteniendo el aviso de copyright.
-Úsalo siempre de forma ética y **solo sobre sistemas autorizados**.
+Project published under the **MIT** license(see `LICENSE`):you can download,
+use, modifyand share it freely, keepingthe copyright notice.
+Always use it ethicallyand **only against authorized systems**.

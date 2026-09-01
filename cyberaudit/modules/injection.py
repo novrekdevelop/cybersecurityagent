@@ -1,6 +1,6 @@
-"""Detección de inyección: fugas de error, puntos de interés y reflexión benigna.
+"""Injection detection: error leaks, points of interestand benign reflection.
 
-Las pruebas de reflexión usan un marcador inofensivo y SOLO se ejecutan con --active.
+Reflection tests use a harmless markerand ONLY run with --active.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def _inject_param(url: str, key: str, payload: str) -> str:
 
 class InjectionModule(AuditModule):
     name = "injection"
-    description = "Detección pasiva de inyección y puntos de interés"
+    description = "Passive injection detectionand points of interest"
 
     def run(self):
         self._seen: Set[str] = set()
@@ -66,14 +66,14 @@ class InjectionModule(AuditModule):
         for label, url in error_pages.items():
             if self._dedupe("err:" + label):
                 self.register(
-                    title=f"Posible fuga de error de base de datos: {label}",
+                    title=f"Possible database error leak: {label}",
                     description="La aplicación devuelve información interna (errores SQL, "
                                 "trazas, modo debug) útil para identificar vulnerabilidades "
                                 "de inyección o detallar la infraestructura.",
                     severity=Severity.MEDIUM, cwe="CWE-209", owasp="A05:2021", url=url,
                     evidence=f"Patrón detectado: {label}",
-                    remediation="Desactiva los detalles de error en producción y usa páginas "
-                                "de error personalizadas.")
+                    remediation="Disable error detailsin productionand use custom "
+                                "error pages.")
 
     def _scan_params(self, pages):
         params_seen = 0
@@ -87,16 +87,16 @@ class InjectionModule(AuditModule):
                     params_seen += 1
                     if self._dedupe("param:" + key_u):
                         self.register(
-                            title=f"Parámetro de interés potencial: '{key_u}'",
-                            description="Parámetros como id/page/file/url suelen alimentar "
-                                        "consultas SQL, rutas o redirecciones; su manejo "
-                                        "incorrecto es base de SQLi, path traversal u open "
+                            title=f"Potentially interesting parameter: '{key_u}'",
+                            description="Parameters like id/page/file/url usually feed "
+                                        "SQL queries, paths or redirects; mishandling "
+                                        "them is the basis for SQLi, path traversal or open "
                                         "redirect.",
                             severity=Severity.INFO, cwe="CWE-20", owasp="A03:2021",
                             url=page["url"],
                             evidence=f'"{key_u}={val}" en {page["url"]}',
-                            remediation="Parametriza consultas, valida rutas con allowlist y "
-                                        "redirecciones contra lista blanca de orígenes.")
+                            remediation="Parameterize queries, validate paths with an allowlistand "
+                                        "redirects against an origin whitelist.")
                         break
             if params_seen >= 25:
                 break
@@ -121,11 +121,11 @@ class InjectionModule(AuditModule):
                     if self._dedupe("reflect:" + key):
                         hits += 1
                         self.register(
-                            title=f"Posible reflexión sin escapar en '{key}'",
-                            description="El marcador benigno se reflejó en la respuesta sin "
-                                        "codificar, indicando un probable XSS reflejado "
-                                        "(no se envió ningún payload real).",
+                            title=f"Possible unescaped reflection in '{key}'",
+                            description="The benign marker was reflected in the response without "
+                                        "encoding, indicating a likely reflected XSS "
+                                        "(no real payload was sent).",
                             severity=Severity.HIGH, cwe="CWE-79", owasp="A03:2021",
                             url=test_url,
-                            evidence=f"Marcador reflejado {resp.text.count(MARKER)} vez/veces.",
-                            remediation="Codifica la salida según contexto y aplica CSP estricta.")
+                            evidence=f"Marker reflected {resp.text.count(MARKER)} time(s).",
+                            remediation="Encode output according to contextand apply strict CSP.")

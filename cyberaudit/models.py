@@ -1,4 +1,4 @@
-"""Modelos de datos del framework de auditoría."""
+"""Data models for the audit framework."""
 
 from __future__ import annotations
 
@@ -30,11 +30,11 @@ class Severity(str, Enum):
     @property
     def label(self) -> str:
         return {
-            "info": "Informativo",
-            "low": "Bajo",
-            "medium": "Medio",
-            "high": "Alto",
-            "critical": "Crítico",
+            "info": "Info",
+            "low": "Low",
+            "medium": "Medium",
+            "high": "High",
+            "critical": "Critical",
         }[self.value]
 
     @property
@@ -44,7 +44,7 @@ class Severity(str, Enum):
 
 @dataclass
 class Finding:
-    """Un hallazgo de seguridad detectado durante la auditoría."""
+    """A security finding detected during the audit."""
 
     title: str
     description: str
@@ -69,11 +69,11 @@ class Finding:
             "owasp": self.owasp,
             "url": self.url,
             "details": self.details,
-            "impacto_economico": self.economic_range(),
+            "economic_impact": self.economic_range(),
         }
 
     def economic_range(self) -> Dict[str, int]:
-        """Rango de impacto económico estimado (EUR) para priorizar remediación."""
+        """Estimated economic impact range (EUR) to prioritize remediation."""
         base = {
             "critical": (120_000, 300_000),
             "high": (15_000, 80_000),
@@ -94,7 +94,7 @@ class Finding:
 
 @dataclass
 class AuditResult:
-    """Resultado global de la auditoría."""
+    """Global audit result."""
 
     target: str
     start_time: float = field(default_factory=time.time)
@@ -115,7 +115,7 @@ class AuditResult:
 
     @property
     def risk_score(self) -> float:
-        """Puntaje de riesgo 0–100 (100 = peor)."""
+        """Risk score 0–100 (100 = worst)."""
         total = sum(f.severity.score for f in self.findings)
         if total >= 200:
             return 100.0
@@ -127,11 +127,11 @@ class AuditResult:
     def grade(self) -> str:
         s = self.risk_score
         if s >= 60:
-            return "Riesgo CRÍTICO — se requiere intervención inmediata"
+            return "CRITICAL risk — immediate action required"
         if s >= 40:
-            return "Riesgo ALTO — se recomienda corrección urgente"
+            return "HIGH risk — urgent remediation recommended"
         if s >= 18:
-            return "Riesgo MEDIO — vulnerabilidades reales a priorizar"
+            return "MEDIUM risk — real vulnerabilities to prioritize"
         if s >= 5:
-            return "Riesgo BAJO — hardening recomendado"
-        return "Superficie amplia — pocos riesgos detectados"
+            return "LOW risk — hardening recommended"
+        return "Broad surface — few risks detected"

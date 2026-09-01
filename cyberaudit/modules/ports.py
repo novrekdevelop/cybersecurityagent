@@ -1,4 +1,4 @@
-"""Escaneo TCP no intrusivo de puertos y servicios comunes."""
+"""Non-intrusive TCP scanning of common ports and services."""
 
 from __future__ import annotations
 
@@ -61,14 +61,14 @@ def _banner(host: str, port: int, timeout: float) -> str:
 
 class PortsModule(AuditModule):
     name = "ports"
-    description = "Escaneo TCP de servicios comunes"
+    description = "TCP scanning of common services"
 
     def run(self):
         cfg = self.ctx.config
         host = host_of(self.ctx.target)
         if not host:
             return
-        info("Escaneando puertos TCP comunes…")
+        info("Scanning common TCP ports…")
         open_ports: List[Dict] = []
 
         with cf.ThreadPoolExecutor(max_workers=min(cfg.concurrency, 32)) as pool:
@@ -84,47 +84,47 @@ class PortsModule(AuditModule):
         self.assets["ports"] = open_ports
 
         if not open_ports:
-            self.log("No se han detectado puertos adicionales.")
+            self.log("No additional ports detected.")
             return
-        self.log("Abiertos: " + ", ".join(f"{p['port']}/{p['service']}" for p in open_ports))
+        self.log("Open: " + ", ".join(f"{p['port']}/{p['service']}" for p in open_ports))
 
         for op in open_ports:
             port, service = op["port"], op["service"]
             if port in SENSITIVE_PORTS:
                 self.register(
-                    title=f"Servicio interno o de datos expuesto: {port}/{service}",
-                    description="Un servicio de base de datos, mensajería o administración está "
-                                "accesible desde Internet; suele indicar un firewall mal configurado.",
+                    title=f"Internal or data service exposed: {port}/{service}",
+                    description="A database, messaging or administration service is "
+                                "reachable from the Internet; usually indicates a misconfigured firewall.",
                     severity=Severity.HIGH, cwe="CWE-668", owasp="A05:2021",
                     url=self.ctx.target,
                     evidence=f"{host}:{port} ({service}) banner={op['banner']!r}",
-                    remediation="Restringe el acceso por firewall/security group a las IPs que "
-                                "lo necesiten.")
+                    remediation="Restrict access via firewall/security group to the IPs that "
+                                "need it.")
             elif port == 23:
                 self.register(
-                    title="Telnet expuesto (sin cifrado)",
-                    description="Telnet transmite credenciales en claro.",
+                    title="Telnet exposed (unencrypted)",
+                    description="Telnet transmits credentials in clear text.",
                     severity=Severity.HIGH, cwe="CWE-319", owasp="A02:2021",
                     url=self.ctx.target,
-                    remediation="Desactiva Telnet; usa SSH.")
+                    remediation="Disable Telnet; use SSH.")
             elif port in (25, 110, 143):
                 self.register(
-                    title=f"Servicio de correo sin cifrado: {port}/{service}",
-                    description="Servicios de correo que pueden aceptar credenciales en claro.",
+                    title=f"Mail service without encryption: {port}/{service}",
+                    description="Mail services that may accept credentials in clear text.",
                     severity=Severity.MEDIUM, cwe="CWE-319", owasp="A02:2021",
                     url=self.ctx.target,
-                    remediation="Exige STARTTLS/SMTPS/IMAPS y bloquea el acceso abierto.")
+                    remediation="Require STARTTLS/SMTPS/IMAPS and block open access.")
             elif port == 22:
                 self.register(
-                    title="SSH accesible desde Internet",
-                    description="SSH expuesto es objetivo continuo de fuerza bruta.",
+                    title="SSH reachable from the Internet",
+                    description="Exposed SSH is a constant target of brute force.",
                     severity=Severity.LOW, cwe="CWE-307", owasp="A07:2021",
                     url=self.ctx.target,
-                    remediation="Usa autenticación por clave, prohibe root y limita IPs.")
+                    remediation="Use key-based authentication, disable root and restrict IPs.")
             elif port == 3389:
                 self.register(
-                    title="RDP accesible desde Internet",
-                    description="RDP expuesto facilita fuerza bruta y exploits conocidos.",
+                    title="RDP reachable from the Internet",
+                    description="Exposed RDP facilitates brute force and known exploits.",
                     severity=Severity.MEDIUM, cwe="CWE-307", owasp="A07:2021",
                     url=self.ctx.target,
-                    remediation="Restringe RDP por VPN o allowlist y activa NLA.")
+                    remediation="Restrict RDP via VPN or allowlist and enable NLA.")

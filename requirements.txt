@@ -1,4 +1,4 @@
-# CyberAudit Pro — Sin dependencias externas.
-# Requiere únicamente Python 3.10 o superior (biblioteca estándar).
-# Instalación:
-#   pip install -r requirements.txt   →   (vacío, no hace falta nada)
+# CyberAudit Pro — No external dependencies.
+# Requires only Python 3.10 or higher (standard library).
+# Installation:
+#   pip install -r requirements.txt   →   (empty, nothing needed)

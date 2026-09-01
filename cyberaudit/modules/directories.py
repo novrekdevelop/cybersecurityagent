@@ -1,4 +1,4 @@
-"""Enumeración de rutas y archivos sensibles con wordlist + hilos."""
+"""Enumeration of sensitive pathsand files with wordlist + threads."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from ..models import Severity
 from ..utils import load_wordlist, ok, info, warn
 from .base import AuditModule
 
-# Patrones de severidad por ruta
+# Severity patterns per path
 CRITICAL_PATHS = re.compile(
     r"\.git/|/\.env($|\.)|actuator/en(v|v/|v$)|wp-config\.php(\.bak|~|\.old)?$|"
     r"\.htpasswd$|phpinfo\.php$|adminer\.php$|\.sql$|\.dump$|backup\.zip$"
@@ -32,7 +32,7 @@ BLOCKED = {401, 403}
 
 class DirectoriesModule(AuditModule):
     name = "directories"
-    description = "Enumeración de directorios y archivos sensibles"
+    description = "Enumeration of directoriesand sensitive files"
 
     def run(self):
         cfg = self.ctx.config
@@ -43,10 +43,10 @@ class DirectoriesModule(AuditModule):
         self.assets["dirs"] = []
         self.assets["robots"] = ""
 
-        info(f"Probando {len(wordlist)} rutas (mismo host)…")
+        info(f"Probing {len(wordlist)} paths (same host)…")
         base_body = self.ctx.base.text
 
-        # Puede ser lento para >150 rutas; ejecutamos con pool de hilos
+        # Can be slow for >150 paths; we run with a thread pool
         with cf.ThreadPoolExecutor(max_workers=min(cfg.concurrency, 16)) as pool:
             futures = {pool.submit(self._probe, base, p): p for p in wordlist}
             results = []
@@ -93,42 +93,42 @@ class DirectoriesModule(AuditModule):
         if status in BLOCKED:
             if MEDIUM_PATHS.search(path):
                 self.register(
-                    title=f"Recurso restringido: '{path}' devuelve {status}",
+                    title=f"Restricted resource: '{path}' returns {status}",
                     description="Existe un recurso protegido con autenticación (401/403) en una "
                                 "zona sensible.",
                     severity=Severity.LOW, cwe="CWE-200", owasp="A01:2021", url=url,
                     evidence=f"{status} · {r['ctype']}",
-                    remediation="Verifica la protección del endpoint y que no filtre contenido.")
+                    remediation="Verify the endpoint protectionand that it does not leak content.")
             return
 
-        # Soft 404: respuesta 200 con tamaño muy similar al de la home
+        # Soft 404: a200 response with many size similar tothe home page
         soft = False
         if status == 200 and base_body and r["size"]:
             ratio = abs(r["size"] - len(base_body)) / max(1, len(base_body))
             soft = ratio < 0.05
 
         if CRITICAL_PATHS.search(path) and status == 200:
-            sep = "Posible fuga de configuración o credenciales" if not soft else \
+            sep = "Possible configuration or credential leak" if not soft else \
                 "Se detectó una ruta crítica (posible soft-404; verificar manualmente)."
             self.register(
-                title=f"Archivo/servicio crítico accesible: '{path}'",
+                title=f"Critical file/service accessible: '{path}'",
                 description=sep + ("" if not soft else " El contenido debe confirmarse a mano."),
                 severity=Severity.CRITICAL if not soft else Severity.MEDIUM,
                 cwe="CWE-540", owasp="A05:2021", url=url,
                 evidence=f"Status {status} · {r['size']} bytes · {r['ctype']}",
-                remediation="Elimina/excluye el archivo del servidor web y rota cualquier "
-                            "secreto que pudiera contener.")
+                remediation="Remove/excludethe file from the web serverand rotate any "
+                            "secret it may contain.")
             return
 
         if HIGH_PATHS.search(path) and status == 200:
             self.register(
-                title=f"Recurso potencialmente sensible accesible: '{path}'",
-                description="Archivo que puede exponer configuración, dependencias, logs o " +
+                title=f"Potentially sensitive resource accessible: '{path}'",
+                description="File that may expose configuration, dependencies, logs or " +
                             ("backups." if not soft else "(posible soft-404; verificar)."),
                 severity=Severity.HIGH if not soft else Severity.LOW,
                 cwe="CWE-538", owasp="A05:2021", url=url,
                 evidence=f"Status {status} · {r['size']} bytes · {r['ctype']}",
-                remediation="Comprueba el contenido y bloquea el acceso a estos ficheros.")
+                remediation="Check the contentand block access to these files.")
             return
 
         if MEDIUM_PATHS.search(path):
@@ -136,15 +136,15 @@ class DirectoriesModule(AuditModule):
             if status == 200:
                 sev = Severity.MEDIUM
             self.register(
-                title=f"Panel o endpoint administrativo localizado: '{path}'",
-                description="Se ha encontrado una zona administrativa o de gestión. Si no "
-                            "incluye MFA, bloqueo de intentos y WAF, es un objetivo de "
-                            "ataque de fuerza bruta.",
+                title=f"Admin panel or endpoint located: '{path}'",
+                description="An administrative or management area was found. If it does not "
+                            "include MFA, login attempt lockoutand WAF, it is a "
+                            "brute-force attack target.",
                 severity=sev, cwe="CWE-306", owasp="A07:2021", url=url,
                 evidence=f"Status {status} · {r['size']} bytes",
-                remediation="Protege los paneles con acceso por IP/red, MFA y rate limiting.")
+                remediation="Protect the panels with IP/network access, MFAand rate limiting.")
 
-        # Listado de directorios (autoindex)
+        # Directory listing (autoindex)
         if (("html" in r["ctype"]) and status == 200
                 and (soft is False) and r["location"] == ""):
             pass  # el marcador de listing se comprueba con GET en _robots_security
@@ -159,26 +159,26 @@ class DirectoriesModule(AuditModule):
             self.assets["robots_disallowed"] = disallow
             if disallow:
                 self.register(
-                    title="robots.txt revela rutas ocultas",
-                    description="El robots.txt enumera rutas que el administrador pretendía "
-                                "ocultar: puede delatar directorios sensibles.",
+                    title="robots.txt reveals hidden paths",
+                    description="The robots.txt lists paths that the administrator tried to "
+                                "hide: it can reveal sensitive directories.",
                     severity=Severity.INFO, cwe="CWE-200", owasp="A05:2021", url=robots.url,
                     evidence="\n".join(disallow[:20]),
-                    remediation="No uses robots.txt para proteger contenido sensible; usa "
-                                "autenticación real.")
+                    remediation="Do not use robots.txt to protect sensitive content; use "
+                                "real authentication.")
         else:
             self.register(
-                title="robots.txt ausente",
-                description="No se encontró robots.txt (comportamiento de rastreadores "
-                            "no controlado).",
+                title="robots.txt missing",
+                description="No robots.txt found (crawler behavior "
+                            "uncontrolled).",
                 severity=Severity.INFO, cwe="CWE-200", owasp="A05:2021", url=base,
-                remediation="Publica un robots.txt y un security.txt.")
+                remediation="Publish a robots.txtanda security.txt.")
 
         sec = http.get(base.rstrip("/") + "/.well-known/security.txt")
         if not sec.ok and sec.status not in (404,):
             self.register(
-                title="security.txt ausente o inaccesible",
-                description="Sin security.txt, los investigadores no tienen canal oficial "
-                            "para reportar vulnerabilidades de forma responsable.",
+                title="security.txt missing or inaccessible",
+                description="Without security.txt, researchers have no official channel "
+                            "to report vulnerabilities responsibly.",
                 severity=Severity.INFO, cwe="CWE-200", owasp="A05:2021", url=base,
-                remediation="Publica /.well-known/security.txt con contacto y política.")
+                remediation="Publish /.well-known/security.txtwith contactand policy.")

@@ -13,19 +13,19 @@ from .models import AuditResult, Severity
 
 def result_dict(result: AuditResult) -> Dict[str, Any]:
     return {
-        "herramienta": "CyberAudit Pro 2.0",
-        "objetivo": result.target,
-        "inicio": datetime.fromtimestamp(result.start_time).isoformat(),
-        "fin": datetime.fromtimestamp(result.end_time).isoformat(),
-        "duracion_seg": result.duration,
-        "puntuacion_riesgo": result.risk_score,
-        "valoracion": result.grade,
-        "resumen_por_severidad": result.summary,
-        "cobertura_owasp": _owasp_coverage(result),
-        "hoja_de_ruta_remediacion": _roadmap_remediation(result),
+        "tool": "CyberAudit Pro 2.0",
+        "target": result.target,
+        "start": datetime.fromtimestamp(result.start_time).isoformat(),
+        "end": datetime.fromtimestamp(result.end_time).isoformat(),
+        "duration_sec": result.duration,
+        "risk_score": result.risk_score,
+        "grade": result.grade,
+        "severity_summary": result.summary,
+        "owasp_coverage": _owasp_coverage(result),
+        "remediation_roadmap": _roadmap_remediation(result),
         "meta": result.meta,
-        "activos": {k: v for k, v in result.assets.items() if k != "_bodies"},
-        "hallazgos": [f.to_dict() for f in result.findings],
+        "assets": {k: v for k, v in result.assets.items() if k != "_bodies"},
+        "findings": [f.to_dict() for f in result.findings],
     }
 
 
@@ -41,34 +41,34 @@ def save_json(result: AuditResult, path: str) -> str:
 def save_markdown(result: AuditResult, path: str) -> str:
     lines: List[str] = []
     w = lines.append
-    w("# 🔒 CyberAudit Pro — Informe de auditoría de seguridad")
+    w("# 🔒 CyberAudit Pro — Security audit report")
     w("")
-    w(f"**Objetivo:** `{result.target}`")
-    w(f"**Fecha:** {datetime.fromtimestamp(result.start_time):%Y-%m-%d %H:%M:%S} "
-      f"· **Duración:** {result.duration}s")
+    w(f"**Target:** `{result.target}`")
+    w(f"**Date:** {datetime.fromtimestamp(result.start_time):%Y-%m-%d %H:%M:%S} "
+      f"· **Duration:** {result.duration}s")
     w("")
-    w("## Resumen ejecutivo")
+    w("## Executive summary")
     w("")
-    w("| Severidad | Nº hallazgos |")
+    w("| Severity | # Findings |")
     w("|-----------|--------------|")
     for s in Severity:
         w(f"| {s.label} | {result.summary.get(s.value, 0)} |")
     w("")
-    w(f"**Puntuación de riesgo:** {result.risk_score}/100 → **{result.grade}**")
+    w(f"**Risk score:** {result.risk_score}/100 → **{result.grade}**")
     lo, hi = _total_economico(result)
-    w(f"**Impacto económico estimado:** {lo} – {hi} EUR")
+    w(f"**Estimated economic impact:** {lo} – {hi} EUR")
     w("")
 
     cov = _owasp_coverage(result)
-    w("## Cobertura del OWASP Top 10 (hallazgos por categoría)")
+    w("## OWASP Top 10 coverage (findings by category)")
     w("")
-    w("| Categoría | Hallazgos |")
+    w("| Category | Findings |")
     w("|-----------|-----------|")
     for ow, n in cov.items():
         label = OWASP_LABELS.get(ow, ow)
         w(f"| {label} | {n} |")
     w("")
-    w("## Hoja de ruta de remediación")
+    w("## Remediation roadmap")
     w("")
     for step in _roadmap_remediation(result):
         w(f"- {step}")
@@ -77,7 +77,7 @@ def save_markdown(result: AuditResult, path: str) -> str:
     if result.findings:
         ordered = sorted(result.findings,
                          key=lambda fnd: fnd.economic_range()["max_eur"], reverse=True)
-        w(f"## Hallazgos ({len(result.findings)}) — priorizados por impacto")
+        w(f"## Findings ({len(result.findings)}) — prioritized by impact")
         w("")
         for i, f in enumerate(ordered, 1):
             eco = f.economic_range()
@@ -85,44 +85,44 @@ def save_markdown(result: AuditResult, path: str) -> str:
                        if eco["max_eur"] else "—")
             w(f"### {i}. [{f.severity.label.upper()}] {f.title}")
             w("")
-            w(f"- **Clase:** {f.module}  ·  **CWE:** {f.cwe or '—'}  ·  **OWASP:** {f.owasp or '—'}")
+            w(f"- **Module:** {f.module}  ·  **CWE:** {f.cwe or '—'}  ·  **OWASP:** {f.owasp or '—'}")
             w(f"- **URL:** {f.url or '—'}")
             w(f"- **Impacto económico estimado:** {eco_txt}")
-            w(f"- **Descripción:** {f.description}")
+            w(f"- **Description:** {f.description}")
             if f.evidence:
-                w(f"- **Evidencia:**")
+                w(f"- **Evidence:**")
                 w("")
                 w(f"  ```")
                 w(f"  {f.evidence[:1200]}")
                 w(f"  ```")
                 w("")
             if f.remediation:
-                w(f"- **Remediación:** {f.remediation}")
+                w(f"- **Remediation:** {f.remediation}")
             w("")
 
-    w("## Inventario de activos")
+    w("## Asset inventory")
     w("")
     assets = result.assets
     exposure = assets.get("internet_exposure", [])
-    internet_txt = ("; ".join(f"{e['ip']} → {len(e['vulns'])} cvEs · {len(e['ports'])} puertos"
-                              for e in exposure[:4]) or "sin datos públicos")
+    internet_txt = ("; ".join(f"{e['ip']} → {len(e['vulns'])} CVEs · {len(e['ports'])} ports"
+                              for e in exposure[:4]) or "no public data")
     mail_txt = (f"SPF: {assets.get('email_spf', '—')} · DKIM: {assets.get('email_dkim', '—')}"
                 f" · DMARC: {assets.get('email_dmarc', '—')}")
     for name, value in [
-        ("Transporte", "https" if assets.get("transport") else "http (en claro)"),
-        ("WAF / perímetro", ", ".join(assets.get("waf", [])) or "no detectado"),
-        ("Exposición Internet (Shodan)", internet_txt),
-        ("Correo (SPF/DKIM/DMARC)", mail_txt),
-        ("Subdominios", ", ".join(assets.get("subdomains", [])[:20]) or "ninguno"),
-        ("Tecnologías", ", ".join(t["name"] for t in assets.get("tech", [])) or "no identificadas"),
-        ("Páginas rastreadas", len(assets.get("pages", []))),
+        ("Transport", "https" if assets.get("transport") else "http (cleartext)"),
+        ("WAF / perimeter", ", ".join(assets.get("waf", [])) or "not detected"),
+        ("Internet exposure (Shodan)", internet_txt),
+        ("Email (SPF/DKIM/DMARC)", mail_txt),
+        ("Subdomains", ", ".join(assets.get("subdomains", [])[:20]) or "none"),
+        ("Technologies", ", ".join(t["name"] for t in assets.get("tech", [])) or "not identified"),
+        ("Pages crawled", len(assets.get("pages", []))),
         ("Formularios", assets.get("forms_total", 0)),
-        ("Puertos abiertos", ", ".join(f"{p['port']}/{p['service']}" for p in assets.get("ports", [])) or "solo 80/443"),
+        ("Open ports", ", ".join(f"{p['port']}/{p['service']}" for p in assets.get("ports", [])) or "only 80/443"),
     ]:
         w(f"- **{name}:** {value}")
     w("")
     w("---")
-    w("*Informe generado automáticamente. Uso exclusivo para auditorías autorizadas.*")
+    w("*Report generated automatically. For authorized audits only.*")
     Path(path).write_text("\n".join(lines), encoding="utf-8")
     return path
 
@@ -196,11 +196,11 @@ def _summary_block(result: AuditResult, assets: Dict[str, Any]) -> str:
 <div class="grid">{cards}</div>
 <div class="score">
   <div class="big">{result.risk_score:.0f}/100</div>
-  <div><h2 style="border:0;margin:0">Valoración</h2>
+  <div><h2 style="border:0;margin:0">Grade</h2>
   <p style="color:#7dd3fc">{f(result.grade)}</p>
-  <p class="meta">Superficie analizada: {pages} páginas ·
-  {assets.get('forms_total', 0)} formularios · {len(result.findings)} hallazgos
-  <br><b style="color:#fbbf24">Impacto económico estimado:
+  <p class="meta">Analyzed surface: {pages} pages ·
+  {assets.get('forms_total', 0)} forms · {len(result.findings)} findings
+  <br><b style="color:#fbbf24">Estimated economic impact:
   {total_lo} – {total_hi} EUR</b></p></div>
 </div>"""
 
@@ -217,17 +217,17 @@ def _fmt_eur(v: int) -> str:
 
 # ------------------------------------------------------------------ OWASP / roadmap
 OWASP_LABELS = {
-    "A01:2021": "A01 — Control de acceso roto",
-    "A02:2021": "A02 — Fallos criptográficos",
-    "A03:2021": "A03 — Inyección",
-    "A04:2021": "A04 — Diseño inseguro",
-    "A05:2021": "A05 — Mala configuración de seguridad",
-    "A06:2021": "A06 — Componentes vulnerables y desactualizados",
-    "A07:2021": "A07 — Fallos de identificación y autenticación",
-    "A08:2021": "A08 — Fallos de integridad de software y datos",
-    "A09:2021": "A09 — Fallos de registro y monitorización",
-    "A10:2021": "A10 — Falsificación de solicitudes del lado del servidor",
-    "sin-mapa": "Sin categoría OWASP asignada",
+    "A01:2021": "A01 — Broken access control",
+    "A02:2021": "A02 — Cryptographic failures",
+    "A03:2021": "A03 — Injection",
+    "A04:2021": "A04 — Insecure design",
+    "A05:2021": "A05 — Security misconfiguration",
+    "A06:2021": "A06 — Vulnerableand outdated components",
+    "A07:2021": "A07 — Identification and authentication failures",
+    "A08:2021": "A08 — Software and data integrity failures",
+    "A09:2021": "A09 — Loggingand monitoring failures",
+    "A10:2021": "A10 — Server-side request forgery",
+    "sin-mapa": "No OWASP category assigned",
 }
 
 
@@ -245,32 +245,32 @@ def _roadmap_remediation(result: AuditResult) -> List[str]:
     s = {sv.value: result.summary.get(sv.value, 0) for sv in Severity}
     items: List[str] = []
     if result.risk_score < 18:
-        items.append(f"**Postura actual aceptable** ({result.grade}). Mantén el "
-                     "hardening y programa auditorías de control periódicas.")
+        items.append(f"**Current posture acceptable** ({result.grade}). Keep "
+                     "hardening and schedule periodic control audits.")
     if s.get("critical"):
-        items.append("**Críticos (acción inmediata):** detén la explotación del hallazgo "
-                     "(rota secretos/credenciales filtradas, desactiva endpoints o "
-                     "servicios comprometidos) y aplica el parche correspondiente en "
+        items.append("**Critical (immediate action):** stop exploitation of the finding "
+                     "(rotate leaked secrets/credentials, disable endpoints or "
+                     "compromised services( and apply the corresponding patch within "
                      "<24–72 h.")
     if s.get("high"):
-        items.append("**Altos (plan en 1–2 semanas):** corrige la configuración de acceso, "
-                     "autenticación y exposición de datos marcada en los hallazgos altos; "
-                     "prioriza lo alcanzable desde Internet.")
+        items.append("**High (plan in 1–2 weeks):** fix the access control, "
+                     "authentication and data exposure flagged in the high findings; "
+                     "prioritize what is reachable from the Internet.")
     if s.get("medium"):
         items.append("**Medios (plan en 1 mes):** endurece cabeceras de seguridad, cookies, "
                      "TLS y procesos (CSRF, rate limiting, validación en servidor).")
     items += [
         "**Identidad y accesos:** activa MFA en paneles y cuentas administrativas, "
         "mínimos privilegios y bloqueo de intentos.",
-        "**Superficie de ataque:** cierra puertos y servicios innecesarios, oculta IPs "
-        "de origen tras WAF/CDN y revisa subdominios/API expuestos.",
-        "**Correo anti-spoofing:** completa SPF/DKIM/DMARC (p=reject) si no están en verde.",
-        "**Gestión de vulnerabilidades:** calendario de actualización de componentes "
-        "(CMS, dependencias) y suscripción a avisos CVE.",
-        "**Monitorización y respuesta:** despliega detección (WAF, SIEM, alertas de "
-        "auth) y un plan de respuesta a incidentes.",
-        "**Re-auditoría:** repite esta auditoría en 4–8 semanas para verificar la "
-        "remediación y medir la bajada del riesgo.",
+        "**Attack surface:** close unnecessary portsand services, hide origin IPs "
+        "behind WAF/CDN and review exposed subdomains/APIs.",
+        "**Anti-spoofing email:** complete SPF/DKIM/DMARC (p=reject) if they are not green.",
+        "**Vulnerability management:** component update schedule "
+        "(CMS, dependencies( and CVE advisory subscription.",
+        "**Monitoringand response:** deploy detection (WAF, SIEM, auth alerts( "
+        "anda incident response plan.",
+        "**Re-audit:** repeat this audit in 4–8 weeks to verify the "
+        "remediationand measure the risk reduction.",
     ]
     return [f"{i}. {item}" for i, item in enumerate(items, 1)]
 
@@ -280,8 +280,8 @@ def save_csv(result: AuditResult, path: str) -> str:
     import csv
     with open(path, "w", newline="", encoding="utf-8-sig") as fh:
         w = csv.writer(fh, delimiter=";")
-        w.writerow(["modulo", "severidad", "titulo", "url", "cwe", "owasp",
-                    "impacto_min_eur", "impacto_max_eur", "evidencia", "remediacion"])
+        w.writerow(["module", "severity", "title", "url", "cwe", "owasp",
+                    "impact_min_eur", "impact_max_eur", "evidence", "remediation"])
         for fnd in result.findings:
             eco = fnd.economic_range()
             w.writerow([fnd.module, fnd.severity.value, fnd.title, fnd.url,
@@ -349,18 +349,18 @@ def _findings_block(result: AuditResult) -> str:
                      key=lambda fnd: fnd.economic_range()["max_eur"], reverse=True)
     filter_bar = (
         '<div class="filterbar">'
-        '<button onclick="filterBy(\'\')">Todos</button>'
-        '<button onclick="filterBy(\'critical\')" style="background:#7f1d1d;color:#fff">Críticos</button>'
-        '<button onclick="filterBy(\'high\')" style="background:#7c2d12;color:#fff">Altos</button>'
-        '<button onclick="filterBy(\'medium\')" style="background:#854d0e;color:#fff">Medios</button>'
-        '<button onclick="filterBy(\'low\')" style="background:#1e3a5f;color:#fff">Bajos</button>'
-        '<button onclick="filterBy(\'info\')" style="background:#164e63;color:#fff">Informativos</button>'
-        '<input id="q" placeholder="Buscar por texto…" onkeyup="searchF()"></div>'
+        '<button onclick="filterBy(\'\')">All</button>'
+        '<button onclick="filterBy(\'critical\')" style="background:#7f1d1d;color:#fff">Critical</button>'
+        '<button onclick="filterBy(\'high\')" style="background:#7c2d12;color:#fff">High</button>'
+        '<button onclick="filterBy(\'medium\')" style="background:#854d0e;color:#fff">Medium</button>'
+        '<button onclick="filterBy(\'low\')" style="background:#1e3a5f;color:#fff">Low</button>'
+        '<button onclick="filterBy(\'info\')" style="background:#164e63;color:#fff">Informational</button>'
+        '<input id="q" placeholder="Search by text…" onkeyup="searchF()"></div>'
     )
     rows = ""
     for rank, find in enumerate(ordered, 1):
         evidence = (f'<pre>{f(find.evidence[:1500])}</pre>' if find.evidence else "")
-        fix = (f'<p class="fix">Remediación: {f(find.remediation)}</p>' if find.remediation else "")
+        fix = (f'<p class="fix">Remediation: {f(find.remediation)}</p>' if find.remediation else "")
         eco = find.economic_range()
         eco_txt = (f'{_fmt_eur(eco["min_eur"])} – {_fmt_eur(eco["max_eur"])} €'
                    if eco["max_eur"] else "—")
@@ -371,9 +371,9 @@ def _findings_block(result: AuditResult) -> str:
             f'<span class="ftitle">{f(find.title)}</span> '
             f'<span class="fmeta">{f(find.cwe or "")} · {f(find.owasp or "")}</span></summary>'
             f'<div class="fbody">'
-            f'<p><b>Módulo:</b> {f(find.module)} &nbsp; '
+            f'<p><b>Module:</b> {f(find.module)} &nbsp; '
             f'<b>URL:</b> <code>{f(find.url or "—")}</code> &nbsp; '
-            f'<b>Impacto estimado:</b> <span style="color:#fbbf24">{f(eco_txt)}</span></p>'
+            f'<b>Estimated impact:</b> <span style="color:#fbbf24">{f(eco_txt)}</span></p>'
             f'<p>{f(find.description)}</p>'
             f'{evidence}{fix}</div></details></div>')
     return f'<h2>Hallazgos ({len(result.findings)}) — priorizados por impacto</h2>\n' + \
@@ -390,7 +390,7 @@ def _owasp_roadmap_block(result: AuditResult) -> str:
         badges += (f'<div class="asset"><h3 style="color:{color}">{f(ow)}</h3>'
                    f'<p>{f(label)}</p><p class="meta"><b>{n}</b> hallazgo(s)</p></div>')
     if not badges:
-        badges = '<p class="meta">Sin hallazgos clasificados.</p>'
+        badges = '<p class="meta">No classified findings.</p>'
     steps = "".join(f"<li>{f(step)}</li>" for step in _roadmap_remediation(result))
     return f"""
 <h2>Cobertura según OWASP Top 10</h2>
@@ -405,7 +405,7 @@ def _assets_block(result: AuditResult) -> str:
     tech = ", ".join(f(t["name"]) for t in assets.get("tech", [])) or "—"
     subs = ", ".join(f(s) for s in assets.get("subdomains", [])[:25]) or "—"
     ports = ", ".join(f'{p["port"]}/{p["service"]}' for p in assets.get("ports", [])) or "—"
-    transport = assets.get("transport") or "HTTP en claro"
+    transport = assets.get("transport") or "cleartext HTTP"
     cookies = assets.get("cookies_analyzed", [])
     cookie_str = ", ".join(f'{c["name"]} [{",".join(c.get("flags", []))}]' for c in cookies) or "—"
     dns = assets.get("dns", {})
@@ -416,7 +416,7 @@ def _assets_block(result: AuditResult) -> str:
     exposure = assets.get("internet_exposure", [])
     exp_str = ("<br>".join(f'<code>{f(e["ip"])}</code> — {len(e["vulns"])} CVE(s) · '
                           f'{len(e["ports"])} puerto(s) · {len(e["cpes"])} cpe(s)'
-                          for e in exposure[:4]) or "sin datos públicos")
+                          for e in exposure[:4]) or "no public data")
     mail_txt = (f'SPF: {f(assets.get("email_spf", "—"))} · '
                 f'DKIM: {f(assets.get("email_dkim", "—"))} · '
                 f'DMARC: {f(assets.get("email_dmarc", "—"))}')
@@ -428,39 +428,39 @@ def _assets_block(result: AuditResult) -> str:
     return f"""
 <h2>Inventario de activos</h2>
 <div class="assets">
-  <div class="asset"><h3>Transporte</h3><p>{f(transport)}</p></div>
-  <div class="asset"><h3>Tecnologías</h3><p>{f(tech)}</p></div>
-  <div class="asset"><h3>Subdominios</h3><p>{f(subs)}</p></div>
-  <div class="asset"><h3>Puertos abiertos</h3><p>{f(ports)}</p></div>
+  <div class="asset"><h3>Transport</h3><p>{f(transport)}</p></div>
+  <div class="asset"><h3>Technologies</h3><p>{f(tech)}</p></div>
+  <div class="asset"><h3>Subdomains</h3><p>{f(subs)}</p></div>
+  <div class="asset"><h3>Open ports</h3><p>{f(ports)}</p></div>
   <div class="asset"><h3>DNS</h3><p>{f(dns_str)}</p></div>
   <div class="asset"><h3>Cookies</h3><p>{f(cookie_str)}</p></div>
-  <div class="asset"><h3>Formularios de login</h3><p>{login_str}</p></div>
-  <div class="asset"><h3>WAF / perímetro</h3><p>{waf}</p></div>
-  <div class="asset"><h3>Exposición Internet (Shodan)</h3><p>{exp_str}</p></div>
-  <div class="asset"><h3>Seguridad de correo</h3><p>{mail_txt}</p></div>
-  <div class="asset"><h3>Páginas analizadas ({len(pages)})</h3><ul>{page_marker or '<li class="meta">—</li>'}</ul></div>
+  <div class="asset"><h3>Login forms</h3><p>{login_str}</p></div>
+  <div class="asset"><h3>WAF / perimeter</h3><p>{waf}</p></div>
+  <div class="asset"><h3>Internet exposure(Shodan)</h3><p>{exp_str}</p></div>
+  <div class="asset"><h3>Email security</h3><p>{mail_txt}</p></div>
+  <div class="asset"><h3>Pages analyzed ({len(pages)})</h3><ul>{page_marker or '<li class="meta">—</li>'}</ul></div>
 </div>"""
 def save_html(result: AuditResult, path: str) -> str:
     f = _esc
     assets = result.assets
     header = f"""<!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Informe de seguridad — {f(result.target)}</title>
+<title>Security report — {f(result.target)}</title>
 <style>{_CSS}</style></head>
 <body><div class="wrap">
 <header>
-  <div class="tag">CYBERAUDIT PRO · INFORME TÉCNICO</div>
-  <h1>Auditoría de seguridad web</h1>
-  <div class="meta">Objetivo: <code>{f(result.target)}</code> &nbsp;·&nbsp;
-  Inicio: {datetime.fromtimestamp(result.start_time):%Y-%m-%d %H:%M:%S} &nbsp;·&nbsp;
-  Duración: {result.duration:.1f}s &nbsp;·&nbsp;
-  Estado objetivo: HTTP {assets.get('http_status', '—')}</div>
+  <div class="tag">CYBERAUDIT PRO · TECHNICAL REPORT</div>
+  <h1>Web security audit</h1>
+  <div class="meta">Target: <code>{f(result.target)}</code> &nbsp;·&nbsp;
+  Start: {datetime.fromtimestamp(result.start_time):%Y-%m-%d %H:%M:%S} &nbsp;·&nbsp;
+  Duration: {result.duration:.1f}s &nbsp;·&nbsp;
+  Target status: HTTP {assets.get('http_status', '—')}</div>
 </header>"""
 
-    footer = """<footer>Informe generado con CyberAudit Pro 2.0 · Uso exclusivo para auditorías autorizadas.
-Los hallazgos indican debilidades que deben verificarse y corregirse; la explotación sin
-permiso escrito está prohibida y puede ser ilegal.</footer>
+    footer = """<footer>Report generated with CyberAudit Pro 2.0 · For authorized audits only.
+Findings indicate weaknesses that must be verified and fixed; exploitation without
+written permission is prohibitedand may be illegal.</footer>
 <script>
 function filterBy(cls){document.querySelectorAll('.finding').forEach(function(el){
 el.style.display=(!cls||el.classList.contains('s-'+cls))?'':'none';});}
@@ -484,13 +484,13 @@ def save_reports(result: AuditResult, config) -> List[str]:
     host = (urlparse(result.target).netloc or "objetivo").replace(":", "_")
     written = []
     if "json" in config.output_formats:
-        written.append(save_json(result, str(outdir / f"informe_{host}_{ts}.json")))
+        written.append(save_json(result, str(outdir / f"report_{host}_{ts}.json")))
     if "md" in config.output_formats:
-        written.append(save_markdown(result, str(outdir / f"informe_{host}_{ts}.md")))
+        written.append(save_markdown(result, str(outdir / f"report_{host}_{ts}.md")))
     if "html" in config.output_formats:
-        written.append(save_html(result, str(outdir / f"informe_{host}_{ts}.html")))
+        written.append(save_html(result, str(outdir / f"report_{host}_{ts}.html")))
     if "csv" in config.output_formats:
-        written.append(save_csv(result, str(outdir / f"informe_{host}_{ts}.csv")))
+        written.append(save_csv(result, str(outdir / f"report_{host}_{ts}.csv")))
     if "sarif" in config.output_formats:
-        written.append(save_sarif(result, str(outdir / f"informe_{host}_{ts}.sarif")))
+        written.append(save_sarif(result, str(outdir / f"report_{host}_{ts}.sarif")))
     return written

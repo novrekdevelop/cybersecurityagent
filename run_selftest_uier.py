@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Valida el fuzzer de credenciales: sitio con login vulnerable a admin/admin."""
+"""Validates the credential fuzzer: site with login vulnerable to admin/admin."""
 import http.server
 import socketserver
 import threading
@@ -11,9 +11,9 @@ PORT = 8896
 
 LOGIN = """<!DOCTYPE html><html><head><title>Login</title></head><body>
 <form action="/login" method="POST">
-<input type="text" name="usuario"><input type="password" name="pass">
+<input type="text" name="username"><input type="password" name="pass">
 <input type="hidden" name="csrf" value="abc123">
-<button>Entrar</button>
+<button>Sign in</button>
 </form></body></html>"""
 
 
@@ -37,16 +37,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length).decode("utf-8", "replace")
         params = dict(urllib.parse.parse_qsl(body))
-        logged = params.get("usuario") == "admin" and params.get("pass") == "admin"
+        logged = params.get("username") == "admin" and params.get("pass") == "admin"
         if logged:
-            out = "<html><body>Bienvenido, admin. <a href='/logout'>Salir</a></body></html>"
+            out = "<html><body>Welcome, admin. <a href='/logout'>Logout</a></body></html>"
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.send_header("Content-Length", str(len(out)))
             self.end_headers()
             self.wfile.write(out.encode())
         else:
-            out = "<html><body>Credenciales incorrectas</body></html>"
+            out = "<html><body>Invalid credentials</body></html>"
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.send_header("Content-Length", str(len(out)))
@@ -61,7 +61,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 def main_test():
     server = Server(("127.0.0.1", PORT), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    print("Servidor login vulnerable en http://127.0.0.1:%d/login" % PORT)
+    print("Vulnerable login server at http://127.0.0.1:%d/login" % PORT)
     code = main([
         "-u", f"http://127.0.0.1:{PORT}/login",
         "--yes", "--no-color",

@@ -1,4 +1,4 @@
-"""Configuración de la auditoría. Cargable desde config.json o por CLI."""
+"""Audit configuration. Loadable from config.json or via CLI."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ DEFAULT_PORTS = [
 class AppConfig:
     # Red y transporte
     timeout: int = 12
-    user_agent: str = "CyberAuditPro/2.0 (auditoría autorizada; contacto: seguridad)"
+    user_agent: str = "CyberAuditPro/2.0 (authorized audit; contact: security)"
     proxy: Optional[str] = None
     verify_tls: bool = True
     session_cookie: Optional[str] = None
@@ -26,16 +26,16 @@ class AppConfig:
     delay: float = 0.0
     random_delay: bool = False
 
-    # Rastreo de contenido
+    # Content crawling
     max_crawl_pages: int = 40
     max_depth: int = 3
 
-    # Rendimiento
+    # Performance
     concurrency: int = 12
     port_timeout: float = 1.5
 
-    # Módulos activados
-    active_checks: bool = False      # pruebas de reflexión (XSS) benignas y optativas
+    # Enabled modules
+    active_checks: bool = False      # benign reflection tests (XSS), opt-in
     run_recon: bool = True
     run_tls: bool = True
     run_headers: bool = True
@@ -46,24 +46,24 @@ class AppConfig:
     run_apis: bool = True
     run_auth: bool = True
     run_payments: bool = True
-    run_fuzer: bool = False   # solo con --fuzz-login (pruebas de credenciales por defecto)
-    run_cves: bool = True     # consulta de CVEs conocidos (OSV) para dependencias
-    run_osint: bool = True    # inteligencia pasiva externa (Shodan InternetDB, WAF)
-    run_emailsec: bool = True # postura de correo: SPF/DKIM/DMARC
-    run_cms: bool = True      # enumeración de CMS (WordPress/Drupal/Joomla/PrestaShop)
+    run_fuzer: bool = False   # only with --fuzz-login (default credential tests)
+    run_cves: bool = True     # known CVEs (OSV) lookup for dependencies
+    run_osint: bool = True    # passive external intelligence (Shodan InternetDB, WAF)
+    run_emailsec: bool = True # email security posture: SPF/DKIM/DMARC
+    run_cms: bool = True      # CMS enumeration (WordPress/Drupal/Joomla/PrestaShop)
 
-    # Fuzzing y listas
+    # Fuzzing and lists
     passwords_wordlist: Optional[str] = None
     max_targets: int = 60
 
-    # Enumeración
+    # Enumeration
     enumerate_subdomains: bool = True
     common_subdomains: bool = False
     probe_subdomains: bool = False
     directory_wordlist: Optional[str] = None
     directory_max_requests: int = 200
 
-    # Informes
+    # Reports
     output_formats: List[str] = field(default_factory=lambda: ["json", "html"])
     output_dir: str = "reports"
 
@@ -89,7 +89,7 @@ class AppConfig:
 
     @classmethod
     def merge_cli(cls, config: "AppConfig", args) -> "AppConfig":
-        """Aplica opciones de argparse sobre la configuración base."""
+        """Applies argparse options over the base configuration."""
         import dataclasses
 
         overrides = {}
@@ -113,7 +113,7 @@ class AppConfig:
             val = getattr(args, cli_attr, None)
             if val is not None:
                 overrides[cfg_attr] = val
-        # Desactivar módulos con --no-*
+        # Disable modules with --no-*
         for flag, cfg_attr in [("no_recon", "run_recon"), ("no_tls", "run_tls"),
                                ("no_headers", "run_headers"), ("no_content", "run_content"),
                                ("no_injection", "run_injection"),

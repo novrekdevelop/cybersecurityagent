@@ -1,7 +1,7 @@
-"""Cliente HTTP robusto sin dependencias externas (solo stdlib).
+"""Robust HTTP client without external dependencies (stdlib only).
 
-Ofrece cookies, redirecciones, proxies, compresión gzip/deflate, control de
-TLS y reintentos básicos para las peticiones de auditoría.
+Provides cookies, redirects, proxies, gzip/deflate compression, TLS control
+and basic retries for audit requests.
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ class _NoRedirect(request.HTTPRedirectHandler):
 
 
 class HttpClient:
-    """Cliente HTTP de auditoría con sesión persistente de cookies."""
+    """Audit HTTP client with a persistent cookie session."""
 
     def __init__(self, config: AppConfig):
         self.timeout = config.timeout
@@ -111,7 +111,7 @@ class HttpClient:
         h = {
             "User-Agent": self.user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
         }
         if self.session_cookie:
             h["Cookie"] = self.session_cookie
@@ -121,7 +121,7 @@ class HttpClient:
         return h
 
     def _polite_wait(self) -> None:
-        """Espera configurada entre peticiones (modo cortesía/stealth)."""
+        """Configured pause between requests (polite/stealth mode)."""
         if self.delay > 0:
             wait = self.delay
             if self.random_delay:
@@ -138,7 +138,7 @@ class HttpClient:
         timeout: Optional[float] = None,
         raw_body: bool = False,
     ) -> HttpResponse:
-        """Ejecuta una petición y devuelve un HttpResponse normalizado."""
+        """Runs a request and returns a normalized HttpResponse."""
         self._polite_wait()
         req = request.Request(url, data=data, headers=self._default_headers(headers))
         req.method = method.upper()
@@ -173,7 +173,7 @@ class HttpClient:
                 ssl.CertificateError, OSError) as e:
             return HttpResponse(error=f"{type(e).__name__}: {e}", url=url)
 
-    # ------------------------------------------------------------------ atajos
+    # ------------------------------------------------------------------ shortcuts
     def get(self, url, **kw):
         return self.request("GET", url, **kw)
 

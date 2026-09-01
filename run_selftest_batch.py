@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Autocomprobación: modo lote (-l) + formatos SARIF/CSV sobre 2 sitios locales."""
+"""Self-test: batch mode (-l) + SARIF/CSV formats over 2 local sites."""
 import http.server
 import os
 import socketserver

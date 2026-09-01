@@ -19,7 +19,7 @@ from .base import AuditModule
 
 
 def _query_osv_package(name: str, ecosystem: str, version: str) -> List[Dict]:
-    """Devuelve los CVEs conocidos para un paquete/versión (máx 4)."""
+    """Returns the known CVEs for a package/version (max 4)."""
     url = "https://api.osv.dev/v1/query"
     payload = {"package": {"name": name, "ecosystem": ecosystem},
                "version": version}
@@ -55,7 +55,7 @@ def _max_severity(vuln: Dict) -> str:
 
 class CvesModule(AuditModule):
     name = "cves"
-    description = "CVEs conocidos para dependencias detectadas (OSV.dev)"
+    description = "Known CVEs for detected dependencies (OSV.dev)"
 
     def run(self):
         if not self.ctx.config.run_cves:
@@ -66,9 +66,9 @@ class CvesModule(AuditModule):
 
         packages = self._collect_dependencies(origin)
         if not packages:
-            self.log("No se detectaron ficheros de dependencias en el origen.")
+            self.log("No dependency files detected on the origin.")
             return
-        info(f"Consultando CVEs para {len(packages)} paquetes (OSV.dev)…")
+        info(f"Querying CVEs for {len(packages)} packages (OSV.dev)…")
         self.assets["dependencies"] = packages
 
         found_any = False
@@ -87,19 +87,19 @@ class CvesModule(AuditModule):
             sev = sev_map.get(vulns[0]["severity"], Severity.MEDIUM)
             if not pkg.get("silent") or sev == Severity.CRITICAL:
                 self.register(
-                    title=f"Vulnerabilidades conocidas (CVEs) en {pkg['name']}@{pkg['version']}",
-                    description=f"El paquete '{pkg['name']}' versión {pkg['version']} "
-                                f"(ecosistema {pkg['ecosystem']}) tiene CVEs públicos: "
-                                f"{cve_ids}. Pueden permitir explotación remota o "
-                                "manipulación de la aplicación.",
+                    title=f"Known vulnerabilities (CVEs) in {pkg['name']}@{pkg['version']}",
+                    description=f"The package '{pkg['name']}' version {pkg['version']} "
+                                f"(ecosystem {pkg['ecosystem']}) has public CVEs: "
+                                f"{cve_ids}. They may allow remote exploitation or "
+                                "manipulation of the application.",
                     severity=sev, cwe="CWE-1035", owasp="A06:2021",
                     url=pkg.get("url", self.ctx.target),
                     evidence="; ".join(f"{v['id']} → {v['summary'][:90]}"
                                        for v in vulns[:4]),
-                    remediation="Actualiza el paquete a la última versión parcheada; "
-                                "revisa dependencias transitivas.")
+                    remediation="Update the package to the latest patched version; "
+                                "review transitive dependencies.")
         if not found_any:
-            self.log("Sin CVEs conocidos para las dependencias detectadas.")
+            self.log("No known CVEs for the detected dependencies.")
 
     # -------PART2-------
 

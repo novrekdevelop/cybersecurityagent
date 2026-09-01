@@ -45,13 +45,13 @@ class FuzzerModule(AuditModule):
     def run(self):
         if not self.ctx.config.run_fuzer:
             return  # nunca automático
-        warn("FUZZER DE CREDENCIALES: ejecuta la lista por defecto; solo contra "
-             "sistemas con autorización expresa.")
+        warn("CREDENTIAL FUZZER: runs the default list; only against "
+             "systems with express authorization.")
         logins = self.assets.get("login_forms", []) or []
         if not logins:
             logins = self._collect_logins()
         if not logins:
-            info("No hay formularios de login detectados para probar.")
+            info("No login forms detected to test.")
             return
 
         done = 0
@@ -62,7 +62,7 @@ class FuzzerModule(AuditModule):
             action = entry.get("action") or url or ""
             if not action:
                 continue
-            # Solo probamos destinos del mismo origen (nunca enviamos credenciales a terceros)
+            # We only probe same-origin destinations(we never send credentials to third parties)
             if not same_origin(action, self.ctx.target):
                 continue
             form = self._find_login_form(action)
@@ -129,16 +129,16 @@ class FuzzerModule(AuditModule):
             success = bool(succ) and not fail
             if success:
                 self.register(
-                    title="Credenciales por defecto VÁLIDAS en el login",
+                    title="Valid default credentials found on the login",
                     description=f"El par '{user}/{pwd}' (credencial por defecto conocida) "
-                                "inicia sesión en el sistema. Permite acceso directo como "
-                                "usuario privilegiado si la cuenta lo es, comprometiendo "
-                                "toda la aplicación.",
+                                "logs into the system. It allows direct access as "
+                                "privileged user ifthe account is one, compromising "
+                                "the entire application.",
                     severity=Severity.CRITICAL, cwe="CWE-798", owasp="A07:2021",
                     url=action, evidence=f"{user} / {pwd} -> HTTP {resp.status}",
-                    remediation="Cambia TODAS las credenciales por defecto, exige contraseñas "
-                                "fuertes y MFA.")
+                    remediation="Change ALL default credentials, require strong "
+                                "passwordsand MFA.")
                 return True
             time.sleep(0.4)  # evita una ráfaga agresiva
-        self.log("La lista de credenciales por defecto NO accedió al login.")
+        self.log("The default credential list did NOT access the login.")
         return False

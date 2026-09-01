@@ -1,12 +1,12 @@
-"""Descubrimiento y análisis profundo de APIs (REST/GraphQL).
+"""Deep discovery and analysis of APIs (REST/GraphQL).
 
-- Extrae endpoints de código JS y de páginas.
-- Prueba rutas de API comunes (/api, /v1, /actuator, /graphql…).
-- Consulta el Wayback Machine para endpoints históricos del mismo origen.
-- Detecta APIs que responden SIN autenticación, datos sensibles,
-  errores verbosos, GraphQL introspection y CORS abierto.
-Todas las peticiones son benignas (GET salvo la consulta de introspection,
-que se limita a lecturas). Las sondas activas se limitan a --active.
+- Extracts endpoints from JS code and pages.
+- Probes common API paths (/api, /v1, /actuator, /graphql…).
+- Queries the Wayback Machine for historical same-origin endpoints.
+- Detects APIs that respond WITHOUT authentication, sensitive data,
+  verbose errors, GraphQL introspection and open CORS.
+All requests are benign (GET except the introspection query,
+which is read-only). Active probes are limited to --active.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from ..models import Severity
 from ..utils import ERROR_PATTERNS, info, origin_of, same_origin, warn
 from .base import AuditModule
 
-# Patrones para extraer URLs/endpoints desde JavaScript y HTML
+# Patterns to extract URLs/endpoints from JavaScriptand HTML
 JS_URL_PATTERNS = [
     re.compile(r"""(?:fetch|axios|XMLHttpRequest|\.ajax|\.get|\.post|\.put|\.delete|\.patch)\s*\(\s*["']([^"'\s]{3,})["']""", re.I),
     re.compile(r"""["']((?:https?:)?//[^"'\s/][^"'\s]{3,})["']"""),
@@ -29,7 +29,7 @@ JS_URL_PATTERNS = [
 ]
 WS_PATTERN = re.compile(r"""wss?://[^"'\s]+""")
 
-# Rutas de API comunes para probar
+# Common API paths to probe
 API_WORDLIST = [
     "api", "api/", "api/v1/", "api/v2/", "api/v3/", "v1/", "v2/", "v3/",
     "rest/", "rest/v1/", "graphql", "graphiql", "swagger", "swagger-ui.html",
@@ -64,7 +64,7 @@ NO_AUTH_PATHS = re.compile(
 
 
 def _extract_candidates(text: str) -> Set[str]:
-    """Devuelve candidatos a endpoints (URLs y paths) de un texto JS/HTML."""
+    """Returns endpoint candidates(URLsand paths) from a JS/HTML text."""
     out: Set[str] = set()
     for pat in JS_URL_PATTERNS:
         for m in pat.finditer(text):
@@ -84,16 +84,16 @@ def _extract_candidates(text: str) -> Set[str]:
 
 class ApisModule(AuditModule):
     name = "apis"
-    description = "Descubrimiento de APIs, endpoints sin autenticación y GraphQL"
+    description = "API discovery, unauthenticated endpoints and GraphQL"
 
     def run(self):
         base_url = self.ctx.base.url or self.ctx.target
         origin = origin_of(base_url)
         if not origin:
             return
-        info("Buscando APIs y endpoints…")
+        info("Looking for APIs and endpoints…")
 
-        # 1) Extraer de JS + HTML
+        # 1) Extract from JS + HTML
         texts = list(self.assets.get("_bodies", {}).values())
         api_candidates: Set[str] = set()
         for rec in self.assets.get("js_analyzed", []):
@@ -103,15 +103,15 @@ class ApisModule(AuditModule):
                 api_candidates.add(cand)
         self.assets["api_candidates_found"] = sorted(api_candidates)[:200]
 
-        # 1b) Endpoints históricos vía Wayback Machine (rebusca pasiva)
+        # 1b) Historical endpoints via Wayback Machine (passive deep-dive)
         for up in self._wayback_urls(origin):
             api_candidates.add(up)
 
-        # 2) Fuzzing de rutas de API comunes
+        # 2) Fuzzing common API paths
         probes = set()
         for p in API_WORDLIST:
             probes.add(urljoin(origin + "/", p))
-        # Endpoints relativos extraídos del código (mismo origen)
+        # Relative endpoints extracted from code (same origin)
         for up in api_candidates:
             up_t = urljoin(origin + "/", up) if up.startswith("/") else (
                 urljoin(base_url, up) if up.startswith("http") else up)
@@ -121,7 +121,7 @@ class ApisModule(AuditModule):
                     probes.add(up_t)
 
         discovered: List[Dict] = []
-        # Sondas en paralelo (acotadas) para no ralentizar la auditoría
+        # Parallel (bounded) probes so as not to slow down the audit
         from concurrent.futures import ThreadPoolExecutor, as_completed
         probes_all = sorted(probes)[:140]
 
@@ -151,13 +151,13 @@ class ApisModule(AuditModule):
         discovered.sort(key=lambda x: x["url"])
         self.assets["apis"] = discovered
 
-        # 3) Análisis de los endpoints descubiertos
+        # 3) Analysis of the discovered endpoints
         if discovered:
-            self.log(f"{len(discovered)} respuestas JSON/API descubiertas.")
+            self.log(f"{len(discovered)} JSON/API responses discovered.")
         self._analyze_endpoints(discovered, origin, base_url)
         self._graphql_probe(origin)
 
-    # ------------------------------------------------------------------ análisis
+    # ------------------------------------------------------------------ analysis
     def _analyze_endpoints(self, discovered, origin, base_url):
         registered_nofun = False
         for ep in discovered[:40]:
@@ -165,58 +165,58 @@ class ApisModule(AuditModule):
             text = ep.get("snippet", "")
             if ep.get("status") != 200:
                 continue
-            # Datos sensibles en la respuesta
+            # Sensitive data in the response
             hit = next((m for m in SENSITIVE_BODY_MARKERS if m in text), "")
             if hit:
                 self.register(
-                    title="La API expone datos potencialmente sensibles",
-                    description="El endpoint devuelve en su cuerpo campos de tipo "
-                                "credencial, token, clave o listado de usuarios sin "
-                                "autenticación visible.",
+                    title="The API exposes potentially sensitive data",
+                    description="The endpoint returns fields of type "
+                                "credential, token, key or user listing without "
+                                "visible authentication.",
                     severity=Severity.HIGH, cwe="CWE-200", owasp="A01:2021",
-                    url=url, evidence=f"Cuerpo incluye: {hit} … {text[:200]}",
-                    remediation="Aplica autenticación/autorización al endpoint y filtra "
-                                "campos sensibles de las respuestas.")
+                    url=url, evidence=f"Body includes: {hit} … {text[:200]}",
+                    remediation="Apply authentication/authorization to the endpoint and filter "
+                                "sensitive fields from responses.")
                 continue
-            # Actuator / config expuesta
+            # Exposed actuator / config
             if "actuator" in url or url.endswith(("/config", "/env", "/api/config")):
                 self.register(
-                    title="Endpoint de configuración/actuador expuesto",
-                    description=("Spring Actuator o un endpoint de configuración devuelve "
-                                 "el estado de la aplicación, librerías, versiones y "
-                                 "posibles claves."),
+                    title="Exposed actuator/configuration endpoint",
+                    description=("Spring Actuator or a configuration endpoint returns "
+                                 "the application state, libraries, versions and "
+                                 "possible keys."),
                     severity=Severity.HIGH, cwe="CWE-200", owasp="A05:2021", url=url,
                     evidence=text[:300],
-                    remediation="Protege los endpoints de actuación o restrínjelos con auth.")
-            # Endpoint sensible sin autenticación
+                    remediation="Protect the actuator endpoints or restrict them with auth.")
+            # Sensitive endpoint without authentication
             path = urlparse(url).path
             if NO_AUTH_PATHS.search(path) and not registered_nofun:
                 self.register(
-                    title="Endpoint de la API responde sin autenticación",
-                    description=f"'{path}' devuelve HTTP 200 con datos JSON sin reto de "
-                                "autenticación. Si contiene datos de usuarios, pedidos o "
-                                "administración, permite operar sin login o abusar del negocio.",
+                    title="API endpoint responds without authentication",
+                    description=f"'{path}' returns HTTP 200 with JSON data without an "
+                                "authentication challenge. If it contains user, order or "
+                                "admin data, it allows operating without login or abusing the business.",
                     severity=Severity.HIGH, cwe="CWE-306", owasp="A01:2021", url=url,
                     evidence=f"GET {url} -> {ep.get('status')} · {ep.get('ctype')}",
-                    remediation="Exige autenticación y autorización por endpoint; usa "
-                                "dial de sesión del servidor, nunca IDs del request.")
+                    remediation="Require authentication and per-endpoint authorization; use "
+                                "server-side session, never request IDs.")
                 registered_nofun = True
-# Errores verbosos en cualquier endpoint de API
+# Verbose errors on any API endpoint
         for ep in discovered[:40]:
             text = (ep.get("snippet", "") or "")[:4000]
             for pat, label in ERROR_PATTERNS:
                 if pat.search(text):
                     self.register(
-                        title="La API devuelve errores detallados",
-                        description="El endpoint filtra trazas/excepciones que revelan stack "
-                                    "interno, queries o rutas del servidor.",
+                        title="The API returns detailed errors",
+                        description="The endpoint leaks traces/exceptions that reveal internal "
+                                    "stack, queries or server paths.",
                         severity=Severity.MEDIUM, cwe="CWE-209", owasp="A05:2021",
                         url=ep["url"], evidence=text[:300],
-                        remediation="Devuelve mensajes de error genéricos y registra el "
-                                    "detalle en logs internos.")
+                        remediation="Return generic error messages and log the "
+                                    "detail in internal logs.")
                     break
 
-        # CORS en APIs (sonda benigna con cabecera Origin)
+        # CORS on APIs (benign probe with Origin header)
         if self.ctx.config.active_checks and discovered:
             test_url = discovered[0]["url"]
             resp = self.ctx.http.get(test_url, headers={
@@ -224,12 +224,12 @@ class ApisModule(AuditModule):
             acao = resp.header("access-control-allow-origin")
             if acao and "attacker.example.com" in acao:
                 self.register(
-                    title="CORS abierto/reflejado en endpoint de API",
-                    description="La API refleja cualquier origen en Access-Control-Allow-"
-                                "Origin; un atacante puede leer respuestas desde su web.",
+                    title="Open/reflected CORS on API endpoint",
+                    description="The API reflects any origin in Access-Control-Allow-"
+                                "Origin; an attacker can read responses from their site.",
                     severity=Severity.HIGH, cwe="CWE-942", owasp="A01:2021",
                     url=test_url, evidence=f"ACAO: {acao}",
-                    remediation="Valida el origen contra una lista blanca.")
+                    remediation="Validate the origin against an allowlist.")
 
     # ------------------------------------------------------------------ graphql
     def _graphql_probe(self, origin):
@@ -243,16 +243,16 @@ class ApisModule(AuditModule):
                                     headers={"Content-Type": "application/json"})
             if r2.status == 200 and "__schema" in r2.text:
                 self.register(
-                    title="GraphQL introspection habilitada",
-                    description="El endpoint GraphQL acepta la consulta de schema, lo que "
-                                "expone todos los tipos, campos y mutaciones de la API.",
+                    title="GraphQL introspection enabled",
+                    description="The GraphQL endpoint accepts the schema query, which "
+                                "exposes all types, fields and mutations of the API.",
                     severity=Severity.HIGH, cwe="CWE-200", owasp="A01:2021", url=url,
-                    evidence="Consulta __schema devuelve 200 con 'types'.",
-                    remediation="Desactiva introspection en producción.")
+                    evidence="__schema query returns 200 with 'types'.",
+                    remediation="Disable introspection in production.")
 
     # ------------------------------------------------------------------ wayback
     def _wayback_urls(self, origin) -> List[str]:
-        """URLs históricas del mismo origen (archivo público), máximo 80."""
+        """Historical URLs from the same origin (public archive), max 80."""
         host = urlparse(origin).netloc
         cdx = (f"https://web.archive.org/cdx/search/cdx?"
                f"url={host}/*&output=json&fl=original&collapse=urlkey&limit=80")

@@ -1,1 +1,1 @@
-"""Módulos de análisis de CyberAudit Pro."""
+"""CyberAudit Pro analysis modules."""

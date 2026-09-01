@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Autocomprobación de los módulos nuevos (osint, emailsec, cms).
+"""Self-test of the new modules (osint, emailsec, cms).
 
-Sirve un sitio tipo WordPress detrás de un "borde" que simula Cloudflare
-(cabeceras cf-ray/Server) para que:
-  - osint      detecte el WAF/perímetro (hallazgo INFO) y salte InternetDB
-               con elegancia en IPs privadas.
-  - cms        enumere WordPress (REST API + usuarios) gracias a los marcadores
-               wp-content/generator.
-  - emailsec   se omita con elegancia en objetivos tipo IP (localhost).
+Serves a WordPress-like site behind an "edge" that simulates Cloudflare
+(cf-ray/Server headers) so that:
+  - osint      detects the WAF/perimeter (INFO finding) and skips InternetDB
+               gracefully on private IPs.
+  - cms        enumerates WordPress (REST API + users) thanks to the
+               wp-content/generator markers.
+  - emailsec   is skipped gracefully on IP-type targets (localhost).
 """
 import http.server
 import json
@@ -42,7 +42,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        # Simula un borde Cloudflare (para que osint lo detecte)
+        # Simulates a Cloudflare edge (so osint detects it)
         self.send_header("cf-ray", "7f1a2b3c4d5e-MAD")
         self.send_header("Server", "cloudflare")
         for k, v in (extra or {}).items():
@@ -73,12 +73,12 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 def main_test():
     server = Server(("127.0.0.1", PORT), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    print(f"WordPress simulado con WAF en http://127.0.0.1:{PORT}/")
+    print(f"Simulated WordPress with WAF at http://127.0.0.1:{PORT}/")
 
-    # Verificación previa de granularidad de módulos nuevos
+    # Pre-check of the new modules granularity
     from cyberaudit import engine
     names = {m.name for m in engine.MODULES}
-    assert {"osint", "emailsec", "cms"} <= names, f"Faltan módulos: {names}"
+    assert {"osint", "emailsec", "cms"} <= names, f"Missing modules: {names}"
 
     code = main([
         "-u", f"http://127.0.0.1:{PORT}",
@@ -88,19 +88,19 @@ def main_test():
         "-f", "json",
     ])
 
-    # Comprobar que los hallazgos de los módulos nuevos han aparecido
+    # Check that the new modules findings appeared
     import glob
     import os
     rep = sorted(glob.glob(os.path.join("reports", f"informe_127.0.0.1_{PORT}_*.json")),
                  key=os.path.getmtime)[-1]
     data = json.load(open(rep, encoding="utf-8"))
-    mods = {f["module"] for f in data["hallazgos"]}
-    print("\nMódulos con hallazgos:", sorted(mods))
-    assert "cms" in mods, "El módulo cms no generó hallazgos"
-    assert "osint" in mods, "El módulo osint no generó hallazgos (WAF no detectado)"
-    assert "emailsec" not in mods, "emailsec no debería generar hallazgos en IP privada"
+    mods = {f["module"] for f in data["findings"]}
+    print("\nModules with findings:", sorted(mods))
+    assert "cms" in mods, "The cms module produced no findings"
+    assert "osint" in mods, "The osint module produced no findings (WAF not detected)"
+    assert "emailsec" not in mods, "emailsec should not produce findings on a private IP"
     server.shutdown()
-    print("Módulos nuevos verificados correctamente ✔")
+    print("New modules verified correctly ✔")
     return code
 
 

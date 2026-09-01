@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prueda de módulos ports + active: arranca test_site, escanea puertos y refleja un marcador."""
+"""Test of ports + active modules: starts test_site, scans ports and reflects a marker."""
 import http.server
 import os
 import socketserver
@@ -18,12 +18,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-    # Endpoint que refleja el parámetro 'q' (para probar reflexión benigna)
+    # Endpoint that reflects the 'q' parameter (to test benign reflection)
     def do_GET(self):
         if self.path.startswith("/echo"):
             import urllib.parse
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("q", [""])[0]
-            body = f"<html><body><div class='resultado'>{q}</div></body></html>".encode("utf-8")
+            body = f"<html><body><div class='result'>{q}</div></body></html>".encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -40,7 +40,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 def main_test():
     server = Server(("127.0.0.1", PORT), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    print(f"Servidor con /echo en http://127.0.0.1:{PORT}/")
+    print(f"Server with /echo at http://127.0.0.1:{PORT}/")
     code = main([
         "-u", f"http://127.0.0.1:{PORT}/echo?q=hola",
         "--yes", "--no-color",

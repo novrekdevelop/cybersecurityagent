@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Autocomprobación: sirve test_site y ejecuta una auditoría completa."""
+"""Self-test: serves test_site and runs a full audit."""
 import http.server
 import os
 import socketserver
@@ -27,7 +27,7 @@ def main_test():
     server = Server(("127.0.0.1", PORT), Handler)
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
-    print(f"Servidor local en http://127.0.0.1:{PORT}/")
+    print(f"Local server at http://127.0.0.1:{PORT}/")
     code = main([
         "-u", f"http://127.0.0.1:{PORT}",
         "--yes", "--no-color",

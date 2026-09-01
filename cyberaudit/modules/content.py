@@ -1,4 +1,4 @@
-"""Análisis de contenido: crawler del sitio, HTML, JS, formularios y e-commerce."""
+"""Content analysis: site crawler, HTML, JS, forms and e-commerce."""
 
 from __future__ import annotations
 
@@ -19,12 +19,12 @@ BIZ_HIDDEN_NAME = re.compile(
     r"nivel|premium|saldo|balance|credit|points|puntos|freeship)(_|$)", re.I)
 ROLE_HIDDEN_NAME = re.compile(r"(role|permiso|permission|isadmin|is_admin|isAdmin|admin|nivel|tier|type)", re.I)
 CSRF_NAME = re.compile(r"csrf|token|authenticity|xsrf|_token", re.I)
-UPLOAD_MSG = "El formulario incluye envío de archivos (multipart/form-data)"
+UPLOAD_MSG = "The form includes file upload (multipart/form-data)"
 ERROR_DIR_MARKERS = ("Index of /", "<title>Index of", "Parent Directory", "Directory listing for")
 
 
 class SiteParser(HTMLParser):
-    """Extrae enlaces, scripts, formularios, meta y comentarios de una página."""
+    """Extracts links, scripts, forms, meta and comments from a page."""
 
     def __init__(self, page_url: str):
         super().__init__(convert_charrefs=True)
@@ -131,7 +131,7 @@ def _page_title(body: str) -> str:
 
 def crawl(http, start_url: str, max_pages: int = 40, max_depth: int = 3,
           js_files: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
-    """BFS limitado al mismo origen. Devuelve registros de páginas analizadas."""
+    """BFS limited to the same origin. Returns records of analyzed pages."""
     visited: Set[str] = set()
     queue: deque = deque([(start_url, 0)])
     pages: List[Dict[str, Any]] = []
@@ -140,7 +140,7 @@ def crawl(http, start_url: str, max_pages: int = 40, max_depth: int = 3,
     if js_files is None:
         js_files = []
 
-    # Puebla la cola con sitemap.xml y robots.txt (más superficie)
+    # Seeds the queue with sitemap.xml and robots.txt (more surface)
     for extra_file in ("/sitemap.xml", "/robots.txt"):
         r = http.get(origin + extra_file)
         if r.status not in (200,) or not r.body:
@@ -180,7 +180,7 @@ def crawl(http, start_url: str, max_pages: int = 40, max_depth: int = 3,
         except Exception:
             pass
 
-        # Descargar JS externos del mismo origen (máx. 20 ficheros, 1.5 MB)
+        # Download same-origin external JS (max 20 files, 1.5 MB)
         for s in parser.scripts:
             src = s.get("src", "")
             if not src or src in fetched_js or len(fetched_js) >= 20:
@@ -236,13 +236,13 @@ def crawl(http, start_url: str, max_pages: int = 40, max_depth: int = 3,
 
 class ContentModule(AuditModule):
     name = "content"
-    description = "Crawler y análisis de HTML/JS/formularios"
+    description = "Crawler and HTML/JS/form analysis"
 
     def run(self):
         self._seen: Set[str] = set()
         start = self.ctx.base.url or self.ctx.target
         cfg = self.ctx.config
-        self.log("Rastreando el sitio (mismo origen)…")
+        self.log("Crawling the site (same origin)…")
         js_files: List[Dict[str, Any]] = []
         pages = crawl(self.ctx.http, start, cfg.max_crawl_pages, cfg.max_depth, js_files)
         bodies = {p["url"]: p.pop("_body", "") for p in pages}
@@ -250,8 +250,8 @@ class ContentModule(AuditModule):
         self.assets["_bodies"] = bodies
         self.assets["pages_analyzed"] = [p for p in pages if p.get("html")]
         self.assets["js_analyzed"] = js_files
-        self.log(f"{len(pages)} respuestas · {len([p for p in pages if p.get('html')])} HTML"
-                 + (f" · {len(js_files)} archivos JS analizados" if js_files else ""))
+        self.log(f"{len(pages)} responses · {len([p for p in pages if p.get('html')])} HTML"
+                 + (f" · {len(js_files)} JS files analyzed" if js_files else ""))
 
         total_forms = 0
         csrf_forms = 0
@@ -275,12 +275,12 @@ class ContentModule(AuditModule):
                 {"url": u, "action": a, "method": m} for u, a, m in login_forms]
         if total_forms and not csrf_forms:
             self.register(
-                title="Formularios sin protección CSRF aparente",
-                description=f"Se localizaron {total_forms} formularios y ninguno incluye token "
-                            "anti-CSRF visible. Riesgo de CSRF en acciones sensibles.",
+                title="Forms without apparent CSRF protection",
+                description=f"{total_forms} forms were found and none include a visible "
+                            "anti-CSRF token. CSRF risk on sensitive actions.",
                 severity=Severity.MEDIUM, cwe="CWE-352", owasp="A01:2021",
                 url=self.ctx.target,
-                remediation="Añade tokens CSRF exclusivos por sesión en todos los formularios.")
+                remediation="Add per-session unique CSRF tokens to all forms.")
 
     # ------------------------------------------------------------------ dedupe
     def _dedupe(self, key: str, url: str) -> bool:
@@ -289,7 +289,7 @@ class ContentModule(AuditModule):
             return False
         self._seen.add(ident)
         return True
-# ------------------------------------------------------------------ página
+# ------------------------------------------------------------------ page
     def _analyze_page(self, page):
         url = page["url"]
         secure_page = url.startswith("https://")
@@ -297,36 +297,36 @@ class ContentModule(AuditModule):
         for secret in page.get("secrets", []):
             if self._dedupe("secret:" + secret, url):
                 self.register(
-                    title=f"Posible secreto en código: {secret}",
-                    description="Se ha detectado un patrón de credencial o clave privada en "
-                                "JavaScript/HTML del lado del cliente.",
+                    title=f"Possible secret in code: {secret}",
+                    description="A credential or private key pattern was detected in "
+                                "client-side JavaScript/HTML.",
                     severity=Severity.HIGH, cwe="CWE-798", owasp="A07:2021", url=url,
-                    evidence=f"Motivo detectado: {secret}",
-                    remediation=("Retira la credencial del código cliente; inválidala (rotación) "
-                                 "y muévela al backend."))
+                    evidence=f"Detected reason: {secret}",
+                    remediation=("Remove the credential from client code; invalidate it "
+                                 "(rotation) and move it to the backend."))
 
         for sink in page.get("js_sinks", []):
             if self._dedupe("sink:" + sink, url):
                 self.register(
-                    title=f"Uso de patrón peligroso en JavaScript: {sink.split('(')[0]}()",
-                    description=f"Se usa '{sink}'. Con entrada de usuario sin sanitizar es un "
-                                "vector clásico de XSS.",
+                    title=f"Dangerous JavaScript pattern in use: {sink.split('(')[0]}()",
+                    description=f"'{sink}' is used. With unsanitized user input it is a "
+                                "classic XSS vector.",
                     severity=Severity.MEDIUM, cwe="CWE-79", owasp="A03:2021", url=url,
                     evidence=sink,
-                    remediation="Sanitiza la entrada y evita escribir HTML desde datos del usuario.")
+                    remediation="Sanitize input and avoid writing HTML from user data.")
 
         for res in page.get("external", []):
             if res.get("kind") == "script" and not res.get("integrity"):
                 if self._dedupe("sri", url):
                     scripts = [r["url"] for r in page["external"] if r["kind"] == "script"]
                     self.register(
-                        title="Scripts de terceros sin Subresource Integrity (SRI)",
-                        description="Los scripts externos podrían ser sustituidos en el CDN o en "
-                                    "tránsito (ataque a la cadena de suministro).",
+                        title="Third-party scripts without Subresource Integrity (SRI)",
+                        description="External scripts could be swapped at the CDN or in "
+                                    "transit (supply chain attack).",
                         severity=Severity.LOW, cwe="CWE-353", owasp="A08:2021", url=url,
                         evidence="; ".join(scripts)[:300],
-                        remediation="Añade integrity (hash SHA-384+) y crossorigin a cada "
-                                    "<script> de terceros.")
+                        remediation="Add integrity (SHA-384+ hash) and crossorigin to each "
+                                    "third-party <script>.")
                 break
 
         if secure_page:
@@ -334,42 +334,42 @@ class ContentModule(AuditModule):
                 if res["url"].startswith("http://"):
                     if self._dedupe("mixed", url):
                         self.register(
-                            title="Contenido mixto: recurso HTTP en página HTTPS",
-                            description="Cargar recursos por HTTP permite su manipulación o robo "
-                                        "de datos en tránsito.",
+                            title="Mixed content: HTTP resource on HTTPS page",
+                            description="Loading resources over HTTP allows their manipulation or data theft "
+                                        "in transit.",
                             severity=Severity.MEDIUM, cwe="CWE-319", owasp="A02:2021", url=url,
                             evidence=res["url"],
-                            remediation="Sirve todos los recursos vía https://.")
+                            remediation="Serve all resources via https://.")
                     break
 
         if page.get("dir_listing") and self._dedupe("dirlisting", url):
             self.register(
-                title="Listado de directorio expuesto",
-                description="El servidor muestra el índice de un directorio, revelando archivos "
-                            "y facilitando encontrar ficheros sensibles.",
+                title="Directory listing exposed",
+                description="The server shows a directory index, revealing files "
+                            "and making it easier to find sensitive ones.",
                 severity=Severity.HIGH, cwe="CWE-538", owasp="A01:2021", url=url,
-                remediation="Desactiva el listado de directorios (autoindex off / -Indexes).")
+                remediation="Disable directory listing (autoindex off / -Indexes).")
 
         emails = page.get("emails", [])
         if emails and self._dedupe("email", url):
             self.register(
-                title="Correos expuestos en el HTML",
-                description="Direcciones de correo recolectables para phishing/spam.",
+                title="Emails exposed in the HTML",
+                description="Email addresses collectable for phishing/spam.",
                 severity=Severity.INFO, cwe="CWE-200", owasp="A05:2021", url=url,
                 evidence=", ".join(emails[:10]),
-                remediation="Ofusca las direcciones públicas.")
+                remediation="Obfuscate public addresses.")
 
         sensitive_comments = [c for c in page.get("comments", []) if re.search(
-            r"(?i)password|token|login|secret|api[_-]?key|debug|todo|fixme|hack|servidor|bbdd|ftp", c)]
+            r"(?i)password|token|login|secret|api[_-]?key|debug|todo|fixme|hack|server|db|ftp", c)]
         if sensitive_comments and self._dedupe("comment", url):
             self.register(
-                title="Comentarios HTML con pistas de seguridad",
-                description="Pueden filtrar detalles internos, endpoints o credenciales.",
+                title="HTML comments with security hints",
+                description="They can leak internal details, endpoints or credentials.",
                 severity=Severity.LOW, cwe="CWE-615", owasp="A01:2021", url=url,
                 evidence="\n".join(sensitive_comments[:6]),
-                remediation="Elimina comentarios de producción que revelen información interna.")
+                remediation="Remove production comments that reveal internal information.")
 
-    # ------------------------------------------------------------------ formularios
+    # ------------------------------------------------------------------ forms
     def _analyze_form(self, form, page_url: str, secure_origin: bool, url_key: str = ""):
         action = form.get("action", "") or page_url
         method = form.get("method", "GET")
@@ -380,63 +380,63 @@ class ContentModule(AuditModule):
         if not self._dedupe("form:" + fkey, url_key or page_url):
             return
 
-        # Login sin CSRF
+        # Login without CSRF
         if is_login and not has_csrf:
             self.register(
-                title="Formulario de login sin token CSRF",
-                description="Un atacante puede forzar inicios de sesión (login CSRF) o hacer "
-                            "phishing en el propio dominio.",
+                title="Login form without CSRF token",
+                description="An attacker can force logins (login CSRF) or run "
+                            "phishing on the domain itself.",
                 severity=Severity.MEDIUM, cwe="CWE-352", owasp="A01:2021",
                 url=page_url, evidence=f"action={action} method={method}",
-                remediation="Añade token CSRF al formulario y verifica en backend.")
+                remediation="Add a CSRF token to the form and verify it on the backend.")
 
-        # Login por GET
+        # Login via GET
         if is_login and method == "GET":
             self.register(
-                title="Credenciales enviadas por GET (login)",
-                description="El login con metodo GET deja las credenciales en la URL, logs y "
-                            "cabeceras Referer.",
+                title="Credentials sent via GET (login)",
+                description="A GET login leaves credentials in the URL, logs and "
+                            "Referer headers.",
                 severity=Severity.HIGH, cwe="CWE-598", owasp="A03:2021",
                 url=page_url, evidence=f"action={action}",
-                remediation="Usa método POST para todo formulario de credenciales.")
+                remediation="Use the POST method for every credential form.")
 
-        # Login o formulario sensible por HTTP
+        # Login or sensitive form over HTTP
         if action.startswith("http://") and secure_origin:
             self.register(
-                title="Envío de formulario por HTTP (en claro)",
-                description="El formulario envía datos a una URL HTTP; credenciales y datos "
-                            "viajan sin cifrar.",
+                title="Form submission over HTTP (in clear)",
+                description="The form sends data to an HTTP URL; credentials and data "
+                            "travel unencrypted.",
                 severity=Severity.HIGH if is_login else Severity.MEDIUM,
                 cwe="CWE-319", owasp="A02:2021", url=page_url, evidence=action,
-                remediation="Sirve el endpoint sobre HTTPS únicamente.")
+                remediation="Serve the endpoint over HTTPS only.")
 
-        # Campos de subida de archivos
+        # File upload fields
         enctype = form.get("enctype", "")
         if "multipart/form-data" in enctype.lower():
             if self._dedupe("upload", page_url):
                 self.register(
-                    title="Formulario con subida de archivos detectado",
-                    description="La subida sin control de tipo, tamaño o contenido permite "
-                                "alojar malware o provocar vulnerabilidades (upload bypass).",
+                    title="Form with file upload detected",
+                    description="Upload without type, size or content control allows "
+                                "hosting malware or triggering vulnerabilities (upload bypass).",
                     severity=Severity.INFO, cwe="CWE-434", owasp="A03:2021",
                     url=page_url, evidence=f"action={action} enctype={enctype}",
-                    remediation="Valida tipo MIME real, extensión, tamaño y contenido; sirve los "
-                                "archivos desde un dominio sin ejecución.")
+                    remediation="Validate real MIME type, extension, size and content; serve "
+                                "files from a domain without code execution.")
 
-        # Campos ocultos de negocio (precio / rol / cupón)
+        # Hidden business fields (price / role / coupon)
         biz_hits = [f for f in fields if f.get("name") and BIZ_HIDDEN_NAME.search(f["name"])]
         if biz_hits:
             bad = [f for f in biz_hits if ROLE_HIDDEN_NAME.search(f.get("name", "")) and f.get("value", "") != ""]
-            kind = "roles/permisos" if bad else "valores de negocio (precio, descuento, importe…)"
+            kind = "roles/permissions" if bad else "business values (price, discount, amount…)"
             if self._dedupe("biz:" + kind, page_url):
                 self.register(
-                    title=f"Lógica de negocio vulnerable a manipulación: {kind}",
-                    description="Existen campos ocultos (hidden) con valores que controlan "
-                                "precios, cupones, cantidades o roles. Si el servidor no los "
-                                "revalida, podrían manipularse desde el cliente.",
+                    title=f"Business logic vulnerable to tampering: {kind}",
+                    description="There are hidden fields with values that control "
+                                "prices, coupons, quantities or roles. If the server does not "
+                                "re-validate them, they could be tampered with from the client.",
                     severity=Severity.MEDIUM, cwe="CWE-840", owasp="A01:2021",
                     url=page_url,
                     evidence="\n".join(f"{f['type']} name={f.get('name')} value={f.get('value')}"
                                        for f in biz_hits[:8]),
-                    remediation="Revalida precios, cantidades y permisos en el servidor; jamás "
-                                "confíes en valores ocultos del formulario.")
+                    remediation="Re-validate prices, quantities and permissions on the server; "
+                                "never trust hidden form values.")
