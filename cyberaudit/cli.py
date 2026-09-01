@@ -138,6 +138,15 @@ def _print_summary(result) -> None:
 def _setup_console() -> None:
     """UTF-8 console to support the bannerand emojis on Windows."""
     enable_windows_ansi()
+    # On Windows, set the console output codepage to UTF-8 so that the banner
+    # and emojis/accents are displayed correctly (equivalent to `chcp 65001`).
+    if os.name == "nt":
+        try:
+            import subprocess
+            subprocess.call(["chcp", "65001"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")

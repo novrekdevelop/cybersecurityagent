@@ -91,7 +91,7 @@ def main_test():
     # Check that the new modules findings appeared
     import glob
     import os
-    rep = sorted(glob.glob(os.path.join("reports", f"informe_127.0.0.1_{PORT}_*.json")),
+    rep = sorted(glob.glob(os.path.join("reports", f"report_127.0.0.1_{PORT}_*.json")),
                  key=os.path.getmtime)[-1]
     data = json.load(open(rep, encoding="utf-8"))
     mods = {f["module"] for f in data["findings"]}

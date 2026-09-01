@@ -21,6 +21,7 @@ venv/
 *.key
 
 # Development scratch files (scripts and temporary output)
+_*.py
 _tr*.py
 _scan*.py
 tr_*.py
