@@ -21,7 +21,7 @@ from ..models import Severity
 from ..utils import ERROR_PATTERNS, info, origin_of, same_origin, warn
 from .base import AuditModule
 
-# Patterns to extract URLs/endpoints from JavaScriptand HTML
+# Patterns to extract URLs/endpoints from JavaScript and HTML
 JS_URL_PATTERNS = [
     re.compile(r"""(?:fetch|axios|XMLHttpRequest|\.ajax|\.get|\.post|\.put|\.delete|\.patch)\s*\(\s*["']([^"'\s]{3,})["']""", re.I),
     re.compile(r"""["']((?:https?:)?//[^"'\s/][^"'\s]{3,})["']"""),
@@ -64,7 +64,7 @@ NO_AUTH_PATHS = re.compile(
 
 
 def _extract_candidates(text: str) -> Set[str]:
-    """Returns endpoint candidates(URLsand paths) from a JS/HTML text."""
+    """Returns endpoint candidates (URLs and paths) from a JS/HTML text."""
     out: Set[str] = set()
     for pat in JS_URL_PATTERNS:
         for m in pat.finditer(text):

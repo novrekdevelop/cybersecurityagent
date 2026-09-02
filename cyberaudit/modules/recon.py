@@ -1,4 +1,4 @@
-"""Passive reconnaissance: DNS, RDAP(WHOIS), subdomainsand technology fingerprint."""
+"""Passive reconnaissance: DNS, RDAP (WHOIS), subdomains and technology fingerprint."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ UA = "CyberAuditPro/2.0 (authorized passive reconnaissance)"
 
 
 def _doh(domain: str, rtype: str) -> List[str]:
-    """Queries DNS over HTTPS(Cloudflare) — passiveand without external binaries."""
+    """Queries DNS over HTTPS (Cloudflare) — passive and without external binaries."""
     _, answers = _doh_lookup(domain, rtype)
     return answers
 
@@ -71,7 +71,7 @@ def _dns_records(domain: str) -> Dict[str, List[str]]:
 
 
 def _rdap(domain: str) -> Dict:
-    """Datos de registro de dominio vía RDAP (sustituye a WHOIS clásico)."""
+    """Domain registration data via RDAP (replaces classic WHOIS)."""
     url = f"https://rdap.org/domain/{domain}"
     try:
         req = http_request.Request(url, headers={"Accept": "application/rdap+json", "User-Agent": UA})
@@ -82,7 +82,7 @@ def _rdap(domain: str) -> Dict:
 
 
 def _crt_sh(domain: str) -> List[str]:
-    """Subdominios vía transparencia de certificados (crt.sh)."""
+    """Subdomains via certificate transparency (crt.sh)."""
     url = f"https://crt.sh/?q=%25.{domain}&output=json"
     try:
         req = http_request.Request(url, headers={"Accept": "application/json", "User-Agent": UA})
@@ -172,7 +172,7 @@ SENSITIVE_SUBDOMAIN_KEYWORDS = ("admin", "vpn", "git", "jenkins", "grafana", "ph
                                 "test", "dev", "internal", "portal", "secret", "intranet",
                                 "external", "sftp", "gateway", "console", "dashboard")
 
-# Servicios cuya falta de reserva permite "secuestrar" un subdominio (CNAME colgante)
+# Services whose lack of reservation allows "hijacking" a subdomain (dangling CNAME)
 TAKEOVER_APEXES = (
     "s3.amazonaws.com", "cloudfront.net", "azurewebsites.net", "azurefd.net",
     "cloudapp.net", "trafficmanager.net", "blob.core.windows.net",
@@ -213,12 +213,12 @@ class ReconModule(AuditModule):
                 missing_mail.append("DKIM")
             if missing_mail and domain.count(".") >= 1:
                 self.register(
-                    title="Políticas de autenticación de correo ausentes",
-                    description="No se encontraron: " + ", ".join(missing_mail) + ". "
-                                "Un atacante podría suplantar este dominio en correos (spoofing).",
+                    title="Email authentication policies missing",
+                    description="Not found: " + ", ".join(missing_mail) + ". "
+                                "An attacker could spoof this domain in emails (spoofing).",
                     severity=Severity.LOW, cwe="CWE-172", owasp="A04:2021",
-                    evidence=f"Registros TXT: {txt_raw[:200] or '(ninguno)'}",
-                    remediation=f"Publica SPF, DKIM y DMARC para {domain}.", url=url)
+                    evidence=f"TXT records: {txt_raw[:200] or '(none)'}",
+                    remediation=f"Publish SPF, DKIM and DMARC for {domain}.", url=url)
 
             # -- RDAP / WHOIS -----------------------------------------------------------
             info("Querying WHOIS/RDAP…")
@@ -231,7 +231,7 @@ class ReconModule(AuditModule):
                 "nameservers": [n.get("ldhName", "") for n in rdap.get("nameservers", [])],
             }
 
-            # -- Subdominios -------------------------------------------------------------
+            # -- Subdomains -------------------------------------------------------------
             if self.ctx.config.enumerate_subdomains or self.ctx.config.common_subdomains:
                 self._find_subdomains(domain)
 
@@ -278,7 +278,7 @@ class ReconModule(AuditModule):
                 severity=Severity.MEDIUM, cwe="CWE-200", owasp="A01:2021",
                 url=self.ctx.target, evidence="\n".join(sensitive[:10]),
                 remediation="Check that sensitive services are not exposed, require "
-                            "authenticationand appear in the asset inventory.",
+                            "authentication and appear in the asset inventory.",
             )
 
     # ------------------------------------------------------------------ takeover
@@ -288,7 +288,7 @@ class ReconModule(AuditModule):
         at_risk = []
         for s in subdomains[:40]:
             if s.lower().rstrip(".") == root.lower():
-                continue  # el dominio raíz se comprueba por separado
+                continue  # the root domain is checked separately
             try:
                 _, cnames = _doh_lookup(s, "CNAME")
             except Exception:
@@ -305,16 +305,16 @@ class ReconModule(AuditModule):
         if at_risk:
             self.assets["takeover_candidates"] = at_risk
             self.register(
-                title="Hijackable subdomains(subdomain takeover)",
-                description="Estos subdominios tienen un CNAME hacia un servicio externo "
-                            "que ya no está asignado (registro DNS colgante). Un atacante "
-                            "puede reclamarlo, publicar contenido en el dominio y robar "
-                            "cookies/sesión o hacer phishing sin levantar sospechas.",
+                title="Hijackable subdomains (subdomain takeover)",
+                description="These subdomains have a CNAME pointing to an external service "
+                            "that is no longer assigned (dangling DNS record). An attacker "
+                            "can claim it, publish content on the domain and steal "
+                            "cookies/sessions or phish without raising suspicion.",
                 severity=Severity.HIGH, cwe="CWE-350", owasp="A05:2021",
                 url=self.ctx.target,
                 evidence="\n".join(f"{a['subdomain']} -> {a['cname']}" for a in at_risk),
-                remediation="Elimina los CNAME huérfanos o reapunta el DNS a un recurso "
-                            "real bajo tu control. Supervisa los CNAMEs de tus subdominios.")
+                remediation="Remove the orphan CNAMEs or repoint the DNS to a resource "
+                            "you control. Monitor the CNAMEs of your subdomains.")
 
     @staticmethod
     def _resolves(host: str) -> bool:

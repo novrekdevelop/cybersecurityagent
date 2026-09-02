@@ -1,13 +1,13 @@
-"""Passive external intelligence(OSINT): public exposure of the target.
+"""Passive external intelligence (OSINT): public exposure of the target.
 
-This is what a cyber-intelligence team does before touchingthe system:
+This is what a cyber-intelligence team does before touching the system:
 - Queries **Shodan InternetDB** (free, no API key) for each IP of the
   target: ports that have been exposed, CPEs ("products" detected),
-  tagsand **known CVEs** associated.
+  tags and **known CVEs** associated.
 - Detection of the edge **WAF / CDN** (Cloudflare, Incapsula/Imperva,
-  Akamai,Sucuri,Vercel…) to understand what sits between the attackerand the origin.
+  Akamai, Sucuri, Vercel…) to understand what sits between the attacker and the origin.
 
-Toda la información es pasiva (solo consultas a fuentes públicas). Nunca se
+All the information is passive (only queries to public sources). It never
 sends traffic against the target.
 """
 
@@ -85,7 +85,7 @@ def _internetdb(ip: str) -> Optional[Dict]:
 
 class OsintModule(AuditModule):
     name = "osint"
-    description = "Passive external intelligence(Shodan InternetDB, CVEs per IP, WAF)"
+    description = "Passive external intelligence (Shodan InternetDB, CVEs per IP, WAF)"
 
     def run(self):
         domain = host_of(self.ctx.target)
@@ -100,7 +100,7 @@ class OsintModule(AuditModule):
             if _is_private(domain):
                 return  # InternetDB solo tiene sentido para IPs públicas
         except ValueError:
-            pass  # dominio normal -> procedemos
+            pass  # normal domain -> proceed
 
         self._internet_exposure(domain)
 
@@ -130,13 +130,13 @@ class OsintModule(AuditModule):
         if any(w in uniq for w in ("Cloudflare", "Incapsula (Imperva)", "Akamai")):
             self.register(
                 title="WAF / CDN detected at the edge",
-                description="El tráfico pasa por un servicio de protección o aceleración: "
-                            + ", ".join(uniq) + ". Verifica que no enmascare el origen "
-                            "(bypass de WAF, DNS rebinding o fugas de IP real).",
+                description="Traffic goes through a protection or acceleration service: "
+                            + ", ".join(uniq) + ". Verify that it does not mask the origin "
+                            "(WAF bypass, DNS rebinding or real IP leaks).",
                 severity=Severity.INFO, cwe="CWE-0", owasp="", url=self.ctx.target,
                 evidence="; ".join(uniq),
-                remediation="Configura correctamente el WAF y evita que el origen sea "
-                            "accesible directamente (allowlist de IPs del CDN/WAF).")
+                remediation="Configure the WAF correctly and prevent the origin from being "
+                            "directly reachable (allowlist of CDN/WAF IPs).")
 
     # ------------------------------------------------------------------ InternetDB
     def _internet_exposure(self, domain: str):
@@ -156,8 +156,8 @@ class OsintModule(AuditModule):
             if not data:
                 continue
             exposure.append(data)
-            self.log(f"InternetDB {ip}: {len(data['ports'])} puertos · "
-                     f"{len(data['cpes'])} cpes · {len(data['vulns'])} cvEs")
+            self.log(f"InternetDB {ip}: {len(data['ports'])} ports · "
+                     f"{len(data['cpes'])} cpes · {len(data['vulns'])} CVEs")
         if not exposure:
             return
         self.assets["internet_exposure"] = exposure
@@ -166,15 +166,15 @@ class OsintModule(AuditModule):
             vulns = data.get("vulns", [])
             if not vulns:
                 continue
-            ports = ", ".join(str(p) for p in data.get("ports", [])[:12]) or "desconocidos"
+            ports = ", ".join(str(p) for p in data.get("ports", [])[:12]) or "unknown"
             self.register(
-                title=f"IP {data['ip']} asociada a vulnerabilidades conocidas (internetDB)",
-                description="Shodan InternetDB asocia CVEs públicos a esta IP según su "
+                title=f"IP {data['ip']} associated with known vulnerabilities (InternetDB)",
+                description="Shodan InternetDB associates public CVEs with this IP based on its "
                             "scan history. Some may already be mitigated, "
                             "but they indicate services/versions that deserve manual review.",
                 severity=Severity.CRITICAL if data.get("cpes") else Severity.HIGH,
                 cwe="CWE-1035", owasp="A06:2021", url=self.ctx.target,
                 evidence=f"IP {data['ip']} · ports {ports}\n" + "\n".join(vulns[:12]),
-                remediation="Inventorythe services of the IP, verify real "
-                            "versionsand apply the patches of the listed CVEs; hide the origin "
+                remediation="Inventory the services of the IP, verify real "
+                            "versions and apply the patches of the listed CVEs; hide the origin "
                             "IP if it does not need to be exposed.")

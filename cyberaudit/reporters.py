@@ -1,4 +1,4 @@
-"""Generación de informes: JSON, Markdown y HTML autocontenido."""
+"""Report generation: JSON, Markdown and self-contained HTML."""
 
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ def save_markdown(result: AuditResult, path: str) -> str:
             w("")
             w(f"- **Module:** {f.module}  ·  **CWE:** {f.cwe or '—'}  ·  **OWASP:** {f.owasp or '—'}")
             w(f"- **URL:** {f.url or '—'}")
-            w(f"- **Impacto económico estimado:** {eco_txt}")
+            w(f"- **Estimated economic impact:** {eco_txt}")
             w(f"- **Description:** {f.description}")
             if f.evidence:
                 w(f"- **Evidence:**")
@@ -116,7 +116,7 @@ def save_markdown(result: AuditResult, path: str) -> str:
         ("Subdomains", ", ".join(assets.get("subdomains", [])[:20]) or "none"),
         ("Technologies", ", ".join(t["name"] for t in assets.get("tech", [])) or "not identified"),
         ("Pages crawled", len(assets.get("pages", []))),
-        ("Formularios", assets.get("forms_total", 0)),
+        ("Forms", assets.get("forms_total", 0)),
         ("Open ports", ", ".join(f"{p['port']}/{p['service']}" for p in assets.get("ports", [])) or "only 80/443"),
     ]:
         w(f"- **{name}:** {value}")
@@ -192,7 +192,7 @@ def _summary_block(result: AuditResult, assets: Dict[str, Any]) -> str:
     pages = len(assets.get("pages", []))
     total_lo, total_hi = _total_economico(result)
     return f"""
-<h2>Resumen ejecutivo</h2>
+<h2>Executive summary</h2>
 <div class="grid">{cards}</div>
 <div class="score">
   <div class="big">{result.risk_score:.0f}/100</div>
@@ -222,17 +222,17 @@ OWASP_LABELS = {
     "A03:2021": "A03 — Injection",
     "A04:2021": "A04 — Insecure design",
     "A05:2021": "A05 — Security misconfiguration",
-    "A06:2021": "A06 — Vulnerableand outdated components",
+    "A06:2021": "A06 — Vulnerable and outdated components",
     "A07:2021": "A07 — Identification and authentication failures",
     "A08:2021": "A08 — Software and data integrity failures",
-    "A09:2021": "A09 — Loggingand monitoring failures",
+    "A09:2021": "A09 — Logging and monitoring failures",
     "A10:2021": "A10 — Server-side request forgery",
     "sin-mapa": "No OWASP category assigned",
 }
 
 
 def _owasp_coverage(result: AuditResult) -> Dict[str, int]:
-    """Hallazgos agrupados por categoría OWASP Top 10 (ordenadas por frecuencia)."""
+    """Findings grouped by OWASP Top 10 category (sorted by frequency)."""
     counts: Dict[str, int] = {}
     for fnd in result.findings:
         ow = (fnd.owasp or "").strip() or "sin-mapa"
@@ -241,7 +241,7 @@ def _owasp_coverage(result: AuditResult) -> Dict[str, int]:
 
 
 def _roadmap_remediation(result: AuditResult) -> List[str]:
-    """Hoja de ruta ejecutiva para remediar la auditoría (numeración continua)."""
+    """Executive roadmap to remediate the audit (continuous numbering)."""
     s = {sv.value: result.summary.get(sv.value, 0) for sv in Severity}
     items: List[str] = []
     if result.risk_score < 18:
@@ -250,27 +250,27 @@ def _roadmap_remediation(result: AuditResult) -> List[str]:
     if s.get("critical"):
         items.append("**Critical (immediate action):** stop exploitation of the finding "
                      "(rotate leaked secrets/credentials, disable endpoints or "
-                     "compromised services( and apply the corresponding patch within "
-                     "<24–72 h.")
+                     "compromised services) and apply the corresponding patch within "
+                     "24–72 hours.")
     if s.get("high"):
         items.append("**High (plan in 1–2 weeks):** fix the access control, "
                      "authentication and data exposure flagged in the high findings; "
                      "prioritize what is reachable from the Internet.")
     if s.get("medium"):
-        items.append("**Medios (plan en 1 mes):** endurece cabeceras de seguridad, cookies, "
-                     "TLS y procesos (CSRF, rate limiting, validación en servidor).")
+        items.append("**Medium (plan in 1 month):** harden security headers, cookies, "
+                     "TLS and processes (CSRF, rate limiting, server-side validation).")
     items += [
-        "**Identidad y accesos:** activa MFA en paneles y cuentas administrativas, "
-        "mínimos privilegios y bloqueo de intentos.",
-        "**Attack surface:** close unnecessary portsand services, hide origin IPs "
+        "**Identity and access:** enable MFA on panels and administrative accounts, "
+        "least privilege and login attempt lockout.",
+        "**Attack surface:** close unnecessary ports and services, hide origin IPs "
         "behind WAF/CDN and review exposed subdomains/APIs.",
         "**Anti-spoofing email:** complete SPF/DKIM/DMARC (p=reject) if they are not green.",
         "**Vulnerability management:** component update schedule "
-        "(CMS, dependencies( and CVE advisory subscription.",
-        "**Monitoringand response:** deploy detection (WAF, SIEM, auth alerts( "
-        "anda incident response plan.",
+        "(CMS, dependencies) and CVE advisory subscription.",
+        "**Monitoring and response:** deploy detection (WAF, SIEM, auth alerts) "
+        "and an incident response plan.",
         "**Re-audit:** repeat this audit in 4–8 weeks to verify the "
-        "remediationand measure the risk reduction.",
+        "remediation and measure the risk reduction.",
     ]
     return [f"{i}. {item}" for i, item in enumerate(items, 1)]
 
@@ -376,8 +376,8 @@ def _findings_block(result: AuditResult) -> str:
             f'<b>Estimated impact:</b> <span style="color:#fbbf24">{f(eco_txt)}</span></p>'
             f'<p>{f(find.description)}</p>'
             f'{evidence}{fix}</div></details></div>')
-    return f'<h2>Hallazgos ({len(result.findings)}) — priorizados por impacto</h2>\n' + \
-        filter_bar + (rows or '<p class="meta">No se detectaron hallazgos en el alcance analizado.</p>')
+    return f'<h2>Findings ({len(result.findings)}) — prioritized by impact</h2>\n' + \
+        filter_bar + (rows or '<p class="meta">No findings detected within the analyzed scope.</p>')
 
 
 def _owasp_roadmap_block(result: AuditResult) -> str:
@@ -388,14 +388,14 @@ def _owasp_roadmap_block(result: AuditResult) -> str:
         color = "#7dc4a0" if ow in ("A01:2021", "A02:2021", "A03:2021") else "#e0a03a"
         label = OWASP_LABELS.get(ow, ow)
         badges += (f'<div class="asset"><h3 style="color:{color}">{f(ow)}</h3>'
-                   f'<p>{f(label)}</p><p class="meta"><b>{n}</b> hallazgo(s)</p></div>')
+                   f'<p>{f(label)}</p><p class="meta"><b>{n}</b> finding(s)</p></div>')
     if not badges:
         badges = '<p class="meta">No classified findings.</p>'
     steps = "".join(f"<li>{f(step)}</li>" for step in _roadmap_remediation(result))
     return f"""
-<h2>Cobertura según OWASP Top 10</h2>
+<h2>Coverage by OWASP Top 10</h2>
 <div class="assets">{badges}</div>
-<h2>Hoja de ruta de remediación</h2>
+<h2>Remediation roadmap</h2>
 <ol class="roadmap">{steps}</ol>"""
 
 
@@ -415,7 +415,7 @@ def _assets_block(result: AuditResult) -> str:
     waf = ", ".join(f(w) for w in assets.get("waf", [])) or "—"
     exposure = assets.get("internet_exposure", [])
     exp_str = ("<br>".join(f'<code>{f(e["ip"])}</code> — {len(e["vulns"])} CVE(s) · '
-                          f'{len(e["ports"])} puerto(s) · {len(e["cpes"])} cpe(s)'
+                          f'{len(e["ports"])} port(s) · {len(e["cpes"])} cpe(s)'
                           for e in exposure[:4]) or "no public data")
     mail_txt = (f'SPF: {f(assets.get("email_spf", "—"))} · '
                 f'DKIM: {f(assets.get("email_dkim", "—"))} · '
@@ -426,7 +426,7 @@ def _assets_block(result: AuditResult) -> str:
         f'<li><code>{f(p["url"])}</code> — HTTP {p.get("status", "?")} '
         f'{f(p.get("title", ""))[:70]}</li>' for p in pages[:12])
     return f"""
-<h2>Inventario de activos</h2>
+<h2>Asset inventory</h2>
 <div class="assets">
   <div class="asset"><h3>Transport</h3><p>{f(transport)}</p></div>
   <div class="asset"><h3>Technologies</h3><p>{f(tech)}</p></div>
@@ -460,7 +460,7 @@ def save_html(result: AuditResult, path: str) -> str:
 
     footer = """<footer>Report generated with CyberAudit Pro 2.0 · For authorized audits only.
 Findings indicate weaknesses that must be verified and fixed; exploitation without
-written permission is prohibitedand may be illegal.</footer>
+written permission is prohibited and may be illegal.</footer>
 <script>
 function filterBy(cls){document.querySelectorAll('.finding').forEach(function(el){
 el.style.display=(!cls||el.classList.contains('s-'+cls))?'':'none';});}

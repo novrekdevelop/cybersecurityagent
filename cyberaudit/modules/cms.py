@@ -3,8 +3,8 @@
 For WordPress / Drupal / Joomla / PrestaShop,a professional auditor runs
 CMS-specific checks: user enumeration,
 exposed REST API, version files, XML-RPC and panels. All probes
-are benign,bounded GETs (≤9 requests( and only run if the CMS was
-detectado.
+are benign, bounded GETs (≤9 requests) and only run if the CMS was
+detected.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ class CmsModule(AuditModule):
                 remediation="Bloquea wp-json si no lo necesitas o protégelo por "
                             "autenticación y plugins de seguridad (ocultar autores).")
 
-        # Enumeración de usuarios vía REST API (clásica)
+        # Classic user enumeration via REST API
         users = http.get(urljoin(origin + "/", "wp-json/wp/v2/users?per_page=20"))
         rows = []
         if users.ok and users.text.lstrip().startswith("["):
@@ -79,11 +79,11 @@ class CmsModule(AuditModule):
             self.register(
                 title="WordPress user enumeration via REST API",
                 description="GET /wp-json/wp/v2/users reveals the usernames, "
-                            "a key prerequisite for brute-force attacksand targeted phishing.",
+                            "a key prerequisite for brute-force attacks and targeted phishing.",
                 severity=Severity.HIGH, cwe="CWE-200", owasp="A05:2021", url=users.url,
                 evidence="\n".join(f"{u['slug'] or '?'} ({u['name'] or '?'}) {u['link'] or ''}"
                                    for u in rows[:12]),
-                remediation="Disable /wp-json/wp/v2/usersand hide the authors in the "
+                remediation="Disable /wp-json/wp/v2/users and hide the authors in the "
                             "posts.")
 
         # Enumeración de autores ?author=N
@@ -112,15 +112,15 @@ class CmsModule(AuditModule):
                             "and helps find exploits." + (f" Version: {v.group(1)}." if v else ""),
                 severity=Severity.MEDIUM, cwe="CWE-200", owasp="A05:2021", url=readme.url,
                 evidence=(f"Version: {v.group(1)}" if v else readme.text[:120]),
-                remediation="Remove readme.htmland avoid disclosing the version.")
+                remediation="Remove readme.html and avoid disclosing the version.")
 
         # xmlrpc.php
         xmlrpc = http.get(urljoin(origin + "/", "xmlrpc.php"))
         if xmlrpc.ok and "XML-RPC" in xmlrpc.text[:200]:
             self.register(
-                title="xmlrpc.php enabled (amplificationand pingback)",
-                description="XML-RPC permite fuerza bruta amplificada (system.multicall), "
-                            "pingbacks (SSRF)and reflection DDoS.",
+                title="xmlrpc.php enabled (amplification and pingback)",
+                description="XML-RPC allows amplified brute force (system.multicall), "
+                            "pingbacks (SSRF) and reflection DDoS.",
                 severity=Severity.MEDIUM, cwe="CWE-400", owasp="A05:2021", url=xmlrpc.url,
                 evidence=xmlrpc.text[:120],
                 remediation="Disable XML-RPC unless a plugin requires it.")
@@ -161,7 +161,7 @@ class CmsModule(AuditModule):
                             "main target for brute-force attacks.",
                 severity=Severity.MEDIUM, cwe="CWE-306", owasp="A07:2021", url=r.url,
                 evidence=f"HTTP {r.status} · {len(r.body)} bytes",
-                remediation="Protect the panel with MFA, login attempt lockoutand IP allowlist.")
+                remediation="Protect the panel with MFA, login attempt lockout and IP allowlist.")
 
     # ------------------------------------------------------------------ prestashop
     def _prestashop(self):
@@ -169,4 +169,4 @@ class CmsModule(AuditModule):
         origin = origin_of(base)
         info("CMS detected: PrestaShop — enumerating specific surface…")
         self.assets["cms"] = "prestashop"
-        # (la enumeración específica de PrestaShop puede ampliarse aquí)
+        # (PrestaShop-specific enumeration can be extended here)

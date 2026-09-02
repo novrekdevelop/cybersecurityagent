@@ -16,7 +16,7 @@ DEFAULT_PORTS = [
 
 @dataclass
 class AppConfig:
-    # Red y transporte
+    # Network and transport
     timeout: int = 12
     user_agent: str = "CyberAuditPro/2.0 (authorized audit; contact: security)"
     proxy: Optional[str] = None

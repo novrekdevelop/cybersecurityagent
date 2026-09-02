@@ -1,8 +1,8 @@
-"""Consulta de CVEs conocidos (vía OSV.dev) para dependencias detectadas.
+"""Known CVEs lookup (via OSV.dev) for detected dependencies.
 
-Analiza ficheros de dependencias del mismo origen (package.json, composer.lock,
-requirements.txt) y consulta la API pública de OSV para listar vulnerabilidades
-conocidas de esas versiones. Coste limitado a N consultas y timeouts cortos.
+Analyzes same-origin dependency files (package.json, composer.lock,
+requirements.txt) and queries the public OSV API to list known
+vulnerabilities for those versions. Limited to N queries and short timeouts.
 """
 
 from __future__ import annotations

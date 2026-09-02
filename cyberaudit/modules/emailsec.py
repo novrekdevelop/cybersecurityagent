@@ -1,14 +1,14 @@
 """Evaluation of the email security posture.
 
 A cybersecurity engineer verifies that the domain cannot be spoofed
-(spoofing)in phishing campaigns. This module evaluates,in a 100% passive way
+(spoofing) in phishing campaigns. This module evaluates, in a 100% passive way
 (via DNS over HTTPS):
 
 - **SPF**: whether a `v=spf1` record exists and what the `all` mechanism is
   (`-all` strict, `~all` softfail, `?all`/`+all` insecure).
-- **DKIM**: detects common selectors(`google`, `selector1/2`, `k1`…).
-- **DMARC**: whether it existsand what policy `p=` publishes (reject/quarantine/none).
-- **MX**: ifthe domain does not manage email, it is reportedandthe alarms are lowered.
+- **DKIM**: detects common selectors (`google`, `selector1/2`, `k1`…).
+- **DMARC**: whether it exists and what policy `p=` publishes (reject/quarantine/none).
+- **MX**: if the domain does not manage email, it is reported and the alarms are lowered.
 
 It sends no email nor touches the target's mail server.
 """
@@ -22,7 +22,7 @@ from ..models import Severity
 from ..utils import doh_lookup, doh_txt, host_of, info
 from .base import AuditModule
 
-# Selectores DKIM más usados por los proveedores de email habituales
+# DKIM selectors most used by common email providers
 DKIM_SELECTORS = (
     "google", "default", "selector1", "selector2", "k1", "k2", "s1", "s2",
     "mail", "dkim", "mandrill", "zoho", "mailchimp", "marketingcloud",
@@ -31,7 +31,7 @@ DKIM_SELECTORS = (
 
 
 def _spf_eval(spf: Optional[str]) -> Dict:
-    """Devuelve {'present': bool, 'all': str, 'hardfail': bool} de un registro SPF."""
+    """Returns {'present': bool, 'all': str, 'hardfail': bool} for an SPF record."""
     if not spf:
         return {"present": False, "all": None, "hardfail": False}
     m = re.search(r"[-+~?]?all\b", spf, re.I)
@@ -48,18 +48,18 @@ def _dmarc_policy(record: str) -> str:
 
 class EmailsecModule(AuditModule):
     name = "emailsec"
-    description = "Email posture: SPF, DKIMand DMARC(anti-spoofing)"
+    description = "Email posture: SPF, DKIM and DMARC (anti-spoofing)"
 
     def run(self):
         domain = host_of(self.ctx.target)
         if not domain:
             return
         if re.match(r"^(\d{1,3}\.){3}\d{1,3}$", domain) or domain == "localhost":
-            return  # solo dominios con DNS público
+            return  # only domains with public DNS
 
         info("Evaluating SPF / DKIM / DMARC…")
 
-        # ---------------- MX: ¿el dominio gestiona correo?
+        # ---------------- MX: does the domain manage email?
         mx = [r for r in doh_lookup(domain, "MX")]
         self.assets["email_mx"] = mx
         if not mx:
@@ -69,13 +69,13 @@ class EmailsecModule(AuditModule):
                             "probably does not send email; the authentication policies "
                             "would still be recommended for defense in depth.",
                 severity=Severity.INFO, cwe="CWE-172", owasp="A04:2021",
-                url=self.ctx.target, evidence="MX: (ninguno)",
-                remediation="IfThe domain does not send email, consider an SPF with -alland "
+                url=self.ctx.target, evidence="MX: (none)",
+                remediation="If the domain does not send email, consider an SPF with -all and "
                             "a DMARC p=reject to block spoofing.")
-            # Sin servidor de correo no hay mucho más que evaluar
-            self.assets["email_spf"] = "sin_mx"
-            self.assets["email_dmarc"] = "sin_mx"
-            self.assets["email_dkim"] = "sin_mx"
+            # Without a mail server there is not much more to evaluate
+            self.assets["email_spf"] = "no_mx"
+            self.assets["email_dmarc"] = "no_mx"
+            self.assets["email_dkim"] = "no_mx"
             return
 
         # ---------------- SPF
@@ -87,11 +87,11 @@ class EmailsecModule(AuditModule):
 
         if not spf["present"]:
             self.register(
-                title="Registro SPF ausente (permite suplantar el dominio)",
-                description="Sin SPF, cualquier servidor puede enviar correo en nombre "
-                            f"de '{domain}' y las compuertas lo aceptarán.",
+                title="SPF record missing (allows domain spoofing)",
+                description="Without SPF, any server can send email on behalf "
+                            f"of '{domain}' and the gateways will accept it.",
                 severity=Severity.HIGH, cwe="CWE-172", owasp="A04:2021",
-                url=self.ctx.target, evidence="TXT SPF: (ninguno)",
+                url=self.ctx.target, evidence="TXT SPF: (none)",
                 remediation=f"Publish a TXT record 'v=spf1 ... -all' for '{domain}'.")
         elif spf["all"] in ("+all", "?all", None):
             is_true_all = spf["all"] == "+all" or spf["all"] is None
@@ -115,21 +115,21 @@ class EmailsecModule(AuditModule):
             if policy == "none":
                 self.register(
                     title="DMARC with p=none policy (no protection)",
-                    description="DMARC existe pero solo monitoriza (p=none): los rechazos "
-                                "de suplantación no se aplican.",
+                    description="DMARC exists but only monitors (p=none): spoofing "
+                                "rejections are not applied.",
                     severity=Severity.MEDIUM, cwe="CWE-172", owasp="A04:2021",
                     url=self.ctx.target, evidence=dmarc,
-                    remediation="Sube la política a p=quarantine y finalmente p=reject, "
-                                "con alineación SPF/DKIM y agregación de informes.")
+                    remediation="Raise the policy to p=quarantine and finally p=reject, "
+                                "with SPF/DKIM alignment and report aggregation.")
         else:
             self.register(
-                title="Registro DMARC ausente (spoofing sin freno)",
+                title="DMARC record missing (unrestricted spoofing)",
                 description="Without DMARC, recipients have no defined policy for "
                             "unauthorized emails; phishing with the client's domain "
                             "will be more credible.",
                 severity=Severity.HIGH, cwe="CWE-172", owasp="A04:2021",
-                url=self.ctx.target, evidence="_dmarc TXT: (ninguno)",
-                remediation=f"Publish a '_dmarc.{domain}' recordwith p=reject.")
+                url=self.ctx.target, evidence="_dmarc TXT: (none)",
+                remediation=f"Publish a '_dmarc.{domain}' record with p=reject.")
 
         # ---------------- DKIM
         present_selectors = []
@@ -145,12 +145,12 @@ class EmailsecModule(AuditModule):
             self.log("DKIM selectors: " + ", ".join(present_selectors))
         else:
             self.register(
-                title="DKIM no detectado (selectores comunes ausentes)",
-                description="No DKIM keys foundin the most commonly used selectors. "
+                title="DKIM not detected (common selectors missing)",
+                description="No DKIM keys found in the most commonly used selectors. "
                             "Outbound mail is not signed, which facilitates "
                             "domain forgery in the From header.",
                 severity=Severity.MEDIUM, cwe="CWE-172", owasp="A04:2021",
                 url=self.ctx.target,
-                evidence="Selectores probados: " + ", ".join(DKIM_SELECTORS[:14]),
-                remediation=f"Configura DKIM con tu proveedor de correo y publica la "
-                            f"clave en '<selector>._domainkey.{domain}'.")
+                evidence="Selectors tested: " + ", ".join(DKIM_SELECTORS[:14]),
+                remediation=f"Configure DKIM with your email provider and publish the "
+                            f"key in '<selector>._domainkey.{domain}'.")

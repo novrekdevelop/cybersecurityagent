@@ -1,4 +1,4 @@
-"""Enumeration of sensitive pathsand files with wordlist + threads."""
+"""Enumeration of sensitive paths and files with wordlist + threads."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ BLOCKED = {401, 403}
 
 class DirectoriesModule(AuditModule):
     name = "directories"
-    description = "Enumeration of directoriesand sensitive files"
+    description = "Enumeration of directories and sensitive files"
 
     def run(self):
         cfg = self.ctx.config
@@ -94,11 +94,11 @@ class DirectoriesModule(AuditModule):
             if MEDIUM_PATHS.search(path):
                 self.register(
                     title=f"Restricted resource: '{path}' returns {status}",
-                    description="Existe un recurso protegido con autenticación (401/403) en una "
-                                "zona sensible.",
+                    description="A resource protected with authentication (401/403) exists in a "
+                                "sensitive area.",
                     severity=Severity.LOW, cwe="CWE-200", owasp="A01:2021", url=url,
                     evidence=f"{status} · {r['ctype']}",
-                    remediation="Verify the endpoint protectionand that it does not leak content.")
+                    remediation="Verify the endpoint protection and that it does not leak content.")
             return
 
         # Soft 404: a200 response with many size similar tothe home page
@@ -109,14 +109,14 @@ class DirectoriesModule(AuditModule):
 
         if CRITICAL_PATHS.search(path) and status == 200:
             sep = "Possible configuration or credential leak" if not soft else \
-                "Se detectó una ruta crítica (posible soft-404; verificar manualmente)."
+                "A critical path was detected (possible soft-404; verify manually)."
             self.register(
                 title=f"Critical file/service accessible: '{path}'",
-                description=sep + ("" if not soft else " El contenido debe confirmarse a mano."),
+                description=sep + ("" if not soft else " The content must be confirmed manually."),
                 severity=Severity.CRITICAL if not soft else Severity.MEDIUM,
                 cwe="CWE-540", owasp="A05:2021", url=url,
                 evidence=f"Status {status} · {r['size']} bytes · {r['ctype']}",
-                remediation="Remove/excludethe file from the web serverand rotate any "
+                remediation="Remove/exclude the file from the web server and rotate any "
                             "secret it may contain.")
             return
 
@@ -124,11 +124,11 @@ class DirectoriesModule(AuditModule):
             self.register(
                 title=f"Potentially sensitive resource accessible: '{path}'",
                 description="File that may expose configuration, dependencies, logs or " +
-                            ("backups." if not soft else "(posible soft-404; verificar)."),
+                            ("backups." if not soft else "(possible soft-404; verify)."),
                 severity=Severity.HIGH if not soft else Severity.LOW,
                 cwe="CWE-538", owasp="A05:2021", url=url,
                 evidence=f"Status {status} · {r['size']} bytes · {r['ctype']}",
-                remediation="Check the contentand block access to these files.")
+                remediation="Check the content and block access to these files.")
             return
 
         if MEDIUM_PATHS.search(path):
@@ -138,11 +138,11 @@ class DirectoriesModule(AuditModule):
             self.register(
                 title=f"Admin panel or endpoint located: '{path}'",
                 description="An administrative or management area was found. If it does not "
-                            "include MFA, login attempt lockoutand WAF, it is a "
+                            "include MFA, login attempt lockout and WAF, it is a "
                             "brute-force attack target.",
                 severity=sev, cwe="CWE-306", owasp="A07:2021", url=url,
                 evidence=f"Status {status} · {r['size']} bytes",
-                remediation="Protect the panels with IP/network access, MFAand rate limiting.")
+                remediation="Protect the panels with IP/network access, MFA and rate limiting.")
 
         # Directory listing (autoindex)
         if (("html" in r["ctype"]) and status == 200
@@ -181,4 +181,4 @@ class DirectoriesModule(AuditModule):
                 description="Without security.txt, researchers have no official channel "
                             "to report vulnerabilities responsibly.",
                 severity=Severity.INFO, cwe="CWE-200", owasp="A05:2021", url=base,
-                remediation="Publish /.well-known/security.txtwith contactand policy.")
+                remediation="Publish /.well-known/security.txt with contact and policy.")

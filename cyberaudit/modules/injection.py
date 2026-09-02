@@ -1,6 +1,6 @@
-"""Injection detection: error leaks, points of interestand benign reflection.
+"""Injection detection: error leaks, points of interest and benign reflection.
 
-Reflection tests use a harmless markerand ONLY run with --active.
+Reflection tests use a harmless marker and ONLY run with --active.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def _inject_param(url: str, key: str, payload: str) -> str:
 
 class InjectionModule(AuditModule):
     name = "injection"
-    description = "Passive injection detectionand points of interest"
+    description = "Passive injection detection and points of interest"
 
     def run(self):
         self._seen: Set[str] = set()
@@ -67,12 +67,12 @@ class InjectionModule(AuditModule):
             if self._dedupe("err:" + label):
                 self.register(
                     title=f"Possible database error leak: {label}",
-                    description="La aplicación devuelve información interna (errores SQL, "
-                                "trazas, modo debug) útil para identificar vulnerabilidades "
-                                "de inyección o detallar la infraestructura.",
+                    description="The application returns internal information (SQL errors, "
+                                "traces, debug mode) useful for identifying injection "
+                                "vulnerabilities or detailing the infrastructure.",
                     severity=Severity.MEDIUM, cwe="CWE-209", owasp="A05:2021", url=url,
-                    evidence=f"Patrón detectado: {label}",
-                    remediation="Disable error detailsin productionand use custom "
+                    evidence=f"Detected pattern: {label}",
+                    remediation="Disable error details in production and use custom "
                                 "error pages.")
 
     def _scan_params(self, pages):
@@ -94,8 +94,8 @@ class InjectionModule(AuditModule):
                                         "redirect.",
                             severity=Severity.INFO, cwe="CWE-20", owasp="A03:2021",
                             url=page["url"],
-                            evidence=f'"{key_u}={val}" en {page["url"]}',
-                            remediation="Parameterize queries, validate paths with an allowlistand "
+                            evidence=f'"{key_u}={val}" in {page["url"]}',
+                            remediation="Parameterize queries, validate paths with an allowlist and "
                                         "redirects against an origin whitelist.")
                         break
             if params_seen >= 25:
@@ -128,4 +128,4 @@ class InjectionModule(AuditModule):
                             severity=Severity.HIGH, cwe="CWE-79", owasp="A03:2021",
                             url=test_url,
                             evidence=f"Marker reflected {resp.text.count(MARKER)} time(s).",
-                            remediation="Encode output according to contextand apply strict CSP.")
+                            remediation="Encode output according to context and apply strict CSP.")

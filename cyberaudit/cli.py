@@ -136,7 +136,7 @@ def _print_summary(result) -> None:
 
 
 def _setup_console() -> None:
-    """UTF-8 console to support the bannerand emojis on Windows."""
+    """UTF-8 console to support the banner and emojis on Windows."""
     enable_windows_ansi()
     # On Windows, set the console output codepage to UTF-8 so that the banner
     # and emojis/accents are displayed correctly (equivalent to `chcp 65001`).

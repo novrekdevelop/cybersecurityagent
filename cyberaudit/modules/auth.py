@@ -215,19 +215,18 @@ class AuthModule(AuditModule):
                             "example.com" in loc and self._sep("redir|" + k + url):
                         self.register(
                             title="Open redirect in login flow",
-                            description="The redirection parameter reflects an external "
-                                        "destination and the server responds 3xx to it "
-                                        "(benign probe)**, which allows phishing that skips "
-                                        "warnings.",
+                            description="The redirect parameter reflects an external "
+                                        "destination and the server responds with a 3xx "
+                                        "to it (benign probe). It enables phishing that bypasses warnings.",
                             severity=Severity.HIGH, cwe="CWE-601", owasp="A01:2021",
                             url=test, evidence=f"Location: {loc}",
-                            remediation="Validate redirects against a whitelist "
+                            remediation="Validate redirects against an allowlist "
                                         "of origins.")
                     break
 
     # ------------------------------------------------------------------ JWT
     def _check_jwts(self, js_all, bodies):
-        """Decodifica JWTs del cliente y busca debilidades (alg none, HMAC débil)."""
+        """Decodes JWTs from the client and looks for weaknesses (alg none, weak HMAC)."""
         import hashlib
         import hmac
 
@@ -260,11 +259,11 @@ class AuthModule(AuditModule):
             if alg == "NONE":
                 self.register(
                     title="JWT with 'none' algorithm (forgeable without signature)",
-                    description="The JWT declares alg=none; ifthe server accepts it, admin "
-                                "tokens can be forged without a secret.",
+                    description="The JWT declares alg=none; if the server accepts it, "
+                                "admin tokens can be forged without a secret.",
                     severity=Severity.CRITICAL, cwe="CWE-347", owasp="A07:2021",
                     url=src_url, evidence=tok[:120] + "…",
-                    remediation="Reject tokenswith alg=none; set an algorithm whitelist "
+                    remediation="Reject tokens with alg=none; set an algorithm whitelist "
                                 "(HS256/RS256) and verify signatures.")
                 continue
             if isinstance(payload, dict):
@@ -272,13 +271,13 @@ class AuthModule(AuditModule):
                              if k in ("password", "secret", "card", "admin", "private")]
                 if sensitive:
                     self.register(
-                        title="JWT exposes sensitive claims in the client",
+                        title="JWT exposes sensitive claimsin the client",
                         description="The visible token contains sensitive fields: " +
                                     ", ".join(sensitive) + ".",
                         severity=Severity.MEDIUM, cwe="CWE-922", owasp="A05:2021",
                         url=src_url, evidence=str(payload)[:200],
                         remediation="Do not put sensitive data in the JWT; use references "
-                                    "by id or encrypt the claims.")
+                                    "by id or encryptthe claims.")
             # HMAC débil (HS256/HS384/HS512)
             if alg in ("HS256", "HS384", "HS512") and len(parts) == 3:
                 signing_input = f"{parts[0]}.{parts[1]}".encode()
@@ -290,12 +289,12 @@ class AuthModule(AuditModule):
                     cand = base64.urlsafe_b64encode(dig).rstrip(b"=").decode()
                     if hmac.compare_digest(cand, sig):
                         self.register(
-                            title="JWT signed with a weak HMAC secret(forgeable)",
-                            description=f"El token usa {alg} con la clave trivial "
-                                        f"'{secret}';the signature can be recomputedand "
+                            title="JWT signed with a weak HMAC secret (forgeable)",
+                            description=f"The token uses {alg} with the trivial key "
+                                        f"'{secret}'; the signature can be recomputed and "
                                         "admin tokens created.",
                             severity=Severity.CRITICAL, cwe="CWE-347", owasp="A07:2021",
                             url=src_url, evidence=tok[:120] + "…",
-                            remediation="Use high-entropy secrets(≥32 bytes( and rotate "
+                            remediation="Use high-entropy secrets (≥32 bytes) and rotate "
                                         "the current key.")
                         break

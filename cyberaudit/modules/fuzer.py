@@ -1,9 +1,9 @@
-"""Prueba acotada de credenciales por defecto en formularios de login.
+"""Bounded test of default credentials in login forms.
 
-SOLO para entornos de pruebas autorizados. Se activa explícitamente con
---fuzz-login. Realiza un número reducido de intentos (una lista corta de
-credenciales por defecto conocidas), con pausas, y se detiene en el primer
-éxito. No hace fuerza bruta masiva.
+ONLY for authorized testing environments. It is explicitly activated with
+--fuzz-login. It runs a reduced number of attempts (a short list of
+known default credentials), with pauses, and stops at the first
+success. No massive brute force.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ FAIL_MARKERS = ("invalid", "incorrecta", "incorrecto", "no valido",
 
 class FuzzerModule(AuditModule):
     name = "fuzzer"
-    description = "Credenciales por defecto en login (solo con --fuzz-login)"
+    description = "Default credentials on login (only with --fuzz-login)"
 
     def run(self):
         if not self.ctx.config.run_fuzer:
@@ -77,12 +77,12 @@ class FuzzerModule(AuditModule):
             hidden = {k: v for k, v in fields.items() if k not in (user_field, pass_field)}
             found = self._test_defaults(action, user_field, pass_field, hidden)
             if found:
-                break  # ya hay un hallazgo crítico
+                break  # already a critical finding
             done += 1
 
     # ------------------------------------------------------------------ self-discovery
     def _collect_logins(self) -> list:
-        """Busca formularios de login por su cuenta (rutas típicas)."""
+        """Finds login forms by their URL (typical routes)."""
         from urllib.parse import urljoin
         from ..utils import origin_of
         origin = origin_of(self.ctx.target)
@@ -130,14 +130,14 @@ class FuzzerModule(AuditModule):
             if success:
                 self.register(
                     title="Valid default credentials found on the login",
-                    description=f"El par '{user}/{pwd}' (credencial por defecto conocida) "
+                    description=f"The pair '{user}/{pwd}' (known default credential) "
                                 "logs into the system. It allows direct access as "
-                                "privileged user ifthe account is one, compromising "
+                                "a privileged user if the account is one, compromising "
                                 "the entire application.",
                     severity=Severity.CRITICAL, cwe="CWE-798", owasp="A07:2021",
                     url=action, evidence=f"{user} / {pwd} -> HTTP {resp.status}",
                     remediation="Change ALL default credentials, require strong "
-                                "passwordsand MFA.")
+                                "passwords and MFA.")
                 return True
             time.sleep(0.4)  # evita una ráfaga agresiva
         self.log("The default credential list did NOT access the login.")

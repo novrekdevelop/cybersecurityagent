@@ -1,11 +1,11 @@
-"""Payment flow analysis: gateways, secretsand business logic.
+"""Payment flow analysis: gateways, secrets and business logic.
 
 It detects:
-- Pasarelas de pago usadas (Stripe, PayPal, MercadoPago, Redsys…).
-- Claves públicas/secretas filtradas en el cliente (sk_live, pk_…, · secret).
-- Cálculo de importes en JavaScript (vector clásico de manipulación de pago).
-- Campos ocultos manipulables (precio, descuento, cantidad, envío).
-- Checkout/payment endpointsand whether they go over HTTP or without CSRF.
+- Payment gateways used (Stripe, PayPal, MercadoPago, Redsys…).
+- Public/secret keys leaked in the client (sk_live, pk_…, · secret).
+- Amount calculation in JavaScript (classic payment manipulation vector).
+- Manipulable hidden fields (price, discount, quantity, shipping).
+- Checkout/payment endpoints and whether they go over HTTP or without CSRF.
 Everything is passive/without modifying payment flows.
 """
 
@@ -18,7 +18,7 @@ from ..models import Severity
 from ..utils import info
 from .base import AuditModule
 
-# Detección de pasarelas por marcas en HTML/JS
+# Gateway detection via fingerprints in HTML/JS
 GATEWAY_PATTERNS = {
     "Stripe": re.compile(r"stripe\.js|stripe\.com|pk_(live|test)_|sk_(live|test)_|\bstripe\b", re.I),
     "PayPal": re.compile(r"paypalobjects\.com|paypal\.com|\bpaypal\b", re.I),
@@ -35,7 +35,7 @@ GATEWAY_PATTERNS = {
     "Bizum": re.compile(r"\bbizum\b|bizum\.com", re.I),
 }
 
-# Secretos de pasarela (clave secreta de servidor caída en el cliente)
+# Gateway secrets (server secret key leaked in the client)
 SECRET_KEY_RE = re.compile(
     r"\b(sk|rk|whsec|ra|rzp_live|whsec_|rzp_test)_(live|test)_[0-9A-Za-z]{16,}\b")
 PUBLIC_KEY_RE = re.compile(r"\b(pk_live|pk_test|rzp_live|rzp_test)_[0-9A-Za-z_]{16,}\b")
@@ -43,7 +43,7 @@ GENERIC_SECRET_RE = re.compile(
     r"(?i)(client_secret|secret_key|api_secret|merchant_secret|hoo?k|"
     r"private_key|signature[_-]?key)\s*[:=]\s*['\"][^'\"]{12,}['\"]")
 
-# Importes calculados o asignados en el cliente
+# Amounts calculated or assigned in the client
 CLIENT_PRICE_RE = re.compile(
     r"(?i)(total|subtotal|amount|importe|precio|price|cost|coste)"
     r"\s*[:=]\s*[-+]?\s*\(?[^;]{0,80}?(?:qty|quantity|cantidad|unit|precio|price)"
@@ -66,7 +66,7 @@ HIDDEN_BIZ_RE = re.compile(
 
 class PaymentsModule(AuditModule):
     name = "payments"
-    description = "Payment gateways, leaked secretsand pricing logic"
+    description = "Payment gateways, leaked secrets and pricing logic"
 
     def run(self):
         self._seen_keys: Set[str] = set()
@@ -97,22 +97,22 @@ class PaymentsModule(AuditModule):
         if m:
             self.register(
                 title="Payment gateway SECRET key exposed in the client",
-                description=f"Se encontró '{m.group(0)[:24]}…' en código visible al "
+                description=f"Found '{m.group(0)[:24]}…' in code visible to the "
                             "browser. It is the server key: it allows creating charges, "
-                            "refunds o reading operations ifit falls into third-party hands.",
+                            "refunds or reading operations if it falls into third-party hands.",
                 severity=Severity.CRITICAL, cwe="CWE-798", owasp="A07:2021",
                 url=self.ctx.target, evidence=m.group(0)[:80],
-                remediation="Rotate the key immediately, move it tothe backendand revoke it.")
+                remediation="Rotate the key immediately, move it to the backend and revoke it.")
             return
         m = GENERIC_SECRET_RE.search(haystack)
         if m:
             self.register(
                 title="Possible payment integration secret in the client",
-                description="Un valor con nombre de secreto de integración aparece en "
-                            "HTML/JS cliente: client_secret, secret_key, firma…",
+                description="A value with an integration secret name appears in the "
+                            "client HTML/JS: client_secret, secret_key, signature…",
                 severity=Severity.HIGH, cwe="CWE-798", owasp="A07:2021",
                 url=self.ctx.target, evidence=m.group(0)[:120],
-                remediation="Reviewandrotate the secret; keep these values only on the "
+                remediation="Review and rotate the secret; keep these values only on the "
                             "server.")
         elif PUBLIC_KEY_RE.search(haystack):
             self.log("Public payment keys detected (pk_) — they are not secrets.")
@@ -124,9 +124,9 @@ class PaymentsModule(AuditModule):
             self.register(
                 title="Payment amount calculation done in JavaScript",
                 description="The price/amount is calculated in the client with operations "
-                            "like 'price*qty' or 'total='. Ifthe server trusts the "
+                            "like 'price*qty' or 'total='. If the server trusts the "
                             "received value, an attacker can change the total to 0.01 "
-                            "or negativeand skip the payment gateway.",
+                            "or negative and skip the payment gateway.",
                 severity=Severity.CRITICAL if calc else Severity.HIGH,
                 cwe="CWE-840", owasp="A01:2021", url=self.ctx.target,
                 evidence=calc[0][:160],
@@ -134,16 +134,16 @@ class PaymentsModule(AuditModule):
                             "price; never trust the client total.")
         elif assign:
             self.register(
-                title="Payment amount assignedin the client",
-                description="Amount/total values are assignedin client code "
-                            "and sent tothe server. Verify that the backend "
+                title="Payment amount assigned in the client",
+                description="Amount/total values are assigned in client code "
+                            "and sent to the server. Verify that the backend "
                             "recalculates them from DB.",
                 severity=Severity.HIGH, cwe="CWE-840", owasp="A01:2021",
                 url=self.ctx.target, evidence=assign[0][:160],
-                remediation="Use server-side prices/catalogand validate quantitiesand "
+                remediation="Use server-side prices/catalog and validate quantities and "
                             "amount on the backend.")
 
-    # ------------------------------------------------------------------ campos ocultos
+    # ------------------------------------------------------------------ hidden fields
     def _detect_hidden_fields(self, pages):
         for page in pages:
             html = self.assets.get("_bodies", {}).get(page["url"], "")
@@ -152,13 +152,13 @@ class PaymentsModule(AuditModule):
                 self.register(
                     title=f"Manipulable hidden business field: '{m.group(1)}'",
                     description="The checkout includes a hidden input with a "
-                                "price/amount/discount/quantity value that is sent tothe "
+                                "price/amount/discount/quantity value that is sent to the "
                                 "server. Changing it in the client could alter "
-                                "the charged total ifthere is no revalidation.",
+                                "the charged total if there is no revalidation.",
                     severity=Severity.HIGH, cwe="CWE-840", owasp="A01:2021",
                     url=page["url"], evidence=m.group(0)[:200],
                     remediation="Do not use editable hidden fields for business; "
-                                "recalculate amountand discounts on the server "
+                                "recalculate amount and discounts on the server "
                                 "from the authorized source.")
 
     def _seen(self, key: str) -> bool:
@@ -184,13 +184,13 @@ class PaymentsModule(AuditModule):
                 action = form.get("action", "")
                 if action.startswith("http://") and secure:
                     self.register(
-                        title="Envío de datos de pago por HTTP (en claro)",
+                        title="Payment data sent over HTTP (cleartext)",
                         description="Checkout data travels unencrypted; cards, "
-                                    "amountsand coupons are exposed to MITM.",
+                                    "amounts and coupons are exposed to MITM.",
                         severity=Severity.CRITICAL, cwe="CWE-319", owasp="A02:2021",
                         url=url, evidence=f"action={action}",
                         remediation="Serve the payment endpoint exclusively over HTTPS.")
-                # Sin token CSRF en el formulario de pago
+                # No CSRF token in the payment form
                 fields = form.get("fields", [])
                 has_csrf = any(f.get("name") and re.search(
                     r"csrf|token|authenticity|xsrf", f.get("name", ""), re.I) for f in fields)
@@ -202,5 +202,5 @@ class PaymentsModule(AuditModule):
                                     "on behalf of the victim.",
                         severity=Severity.MEDIUM, cwe="CWE-352", owasp="A01:2021",
                         url=url, evidence=f"action={action}",
-                        remediation="Add per-session CSRF tokensin the checkoutand validate "
+                        remediation="Add per-session CSRF tokens in the checkout and validate "
                                     "them on the backend.")
