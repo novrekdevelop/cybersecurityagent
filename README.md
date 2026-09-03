@@ -19,7 +19,7 @@ high-quality reports (HTML / Markdown / JSON).
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/danielsonn2009-svg/agentedeciberseguridad.git
+git clone https://github.com/novrekdevelop/cybersecurityagent.git
 cd agentedeciberseguridad
 
 # 2. Verify the installation (only needs Python 3.10+, no external dependencies)
